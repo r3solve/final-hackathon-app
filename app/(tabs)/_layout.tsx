@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Send, Clock, User } from 'lucide-react-native';
+import { Chrome as Home, Send, Clock, User, Shield } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -36,6 +36,15 @@ export default function TabLayout() {
           title: 'Send',
           tabBarIcon: ({ color, size }) => (
             <Send size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="verification"
+        options={{
+          title: 'Verify',
+          tabBarIcon: ({ color, size }) => (
+            <Shield size={size} color={color} />
           ),
         }}
       />

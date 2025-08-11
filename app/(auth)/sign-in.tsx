@@ -3,13 +3,14 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Mail, AlertCircle } from 'lucide-react-native';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false);
+  const { signIn, resendVerificationEmail } = useAuth();
 
   const handleSignIn = async () => {
     if (!email.trim() || !password) {
@@ -18,15 +19,61 @@ export default function SignIn() {
     }
 
     setLoading(true);
-    const { error } = await signIn(email, password);
+    const { error, success } = await signIn(email, password);
     setLoading(false);
 
     if (error) {
-      Alert.alert('Sign In Error', error);
-    } else {
+      if (error.includes('verify your email')) {
+        setShowVerificationMessage(true);
+      } else {
+        Alert.alert('Sign In Error', error);
+      }
+    } else if (success) {
       router.replace('/(tabs)');
     }
   };
+
+  const handleResendVerification = async () => {
+    const { error, success } = await resendVerificationEmail();
+    if (success) {
+      Alert.alert('Success', 'Verification email sent! Please check your inbox.');
+    } else {
+      Alert.alert('Error', error || 'Failed to send verification email');
+    }
+  };
+
+  if (showVerificationMessage) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.verificationContainer}>
+          <AlertCircle size={80} color="#F59E0B" />
+          <Text style={styles.verificationTitle}>Email Verification Required</Text>
+          <Text style={styles.verificationMessage}>
+            Please verify your email address before signing in. We've sent a verification link to:
+          </Text>
+          <Text style={styles.emailText}>{email}</Text>
+          <Text style={styles.verificationSubMessage}>
+            Check your email and click the verification link to activate your account.
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.resendButton}
+            onPress={handleResendVerification}
+          >
+            <Mail size={20} color="#FFFFFF" />
+            <Text style={styles.resendButtonText}>Resend Verification Email</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setShowVerificationMessage(false)}
+          >
+            <Text style={styles.backButtonText}>Back to Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -148,6 +195,65 @@ const styles = StyleSheet.create({
   linkText: {
     textAlign: 'center',
     color: '#3B82F6',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  verificationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  verificationTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 24,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  verificationMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  emailText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#3B82F6',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  verificationSubMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  resendButton: {
+    backgroundColor: '#3B82F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  resendButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  backButtonText: {
+    color: '#6B7280',
     fontSize: 16,
     fontWeight: '500',
   },

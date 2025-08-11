@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Mail, CheckCircle } from 'lucide-react-native';
 
 export default function SignUp() {
   const [fullName, setFullName] = useState('');
@@ -11,6 +11,7 @@ export default function SignUp() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signUpSuccess, setSignUpSuccess] = useState(false);
   const { signUp } = useAuth();
 
   const validateInputs = () => {
@@ -32,15 +33,40 @@ export default function SignUp() {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password, fullName, phoneNumber);
+    const { error, success } = await signUp(email, password, fullName, phoneNumber);
     setLoading(false);
 
     if (error) {
       Alert.alert('Sign Up Error', error);
-    } else {
-      router.replace('/(tabs)');
+    } else if (success) {
+      setSignUpSuccess(true);
+      // Auto-navigate to sign-in after 3 seconds
+      setTimeout(() => {
+        router.replace('/(auth)/sign-in');
+      }, 3000);
     }
   };
+
+  if (signUpSuccess) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.successContainer}>
+          <CheckCircle size={80} color="#22C55E" />
+          <Text style={styles.successTitle}>Account Created Successfully!</Text>
+          <Text style={styles.successMessage}>
+            We've sent a verification email to:
+          </Text>
+          <Text style={styles.emailText}>{email}</Text>
+          <Text style={styles.verificationMessage}>
+            Please check your email and click the verification link to activate your account.
+          </Text>
+          <Text style={styles.redirectMessage}>
+            Redirecting to sign-in page...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,7 +108,7 @@ export default function SignUp() {
             style={styles.input}
             value={phoneNumber}
             onChangeText={setPhoneNumber}
-            placeholder="+1 (555) 123-4567"
+            placeholder="+233 XX XXX XXXX"
             keyboardType="phone-pad"
           />
         </View>
@@ -177,5 +203,45 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
     fontSize: 16,
     fontWeight: '500',
+  },
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 24,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emailText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#3B82F6',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  verificationMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  redirectMessage: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

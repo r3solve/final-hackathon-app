@@ -1,32 +1,63 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, initializeAuth } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
+import { firebaseConfig } from './config';
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('✅ Firebase initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase initialization failed:', error);
+  throw error;
+}
 
-// Initialize Firebase Auth with AsyncStorage persistence
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Initialize Firebase Auth
+let auth;
+try {
+  auth = getAuth(app);
+  console.log('✅ Firebase Auth initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase Auth initialization failed:', error);
+  throw error;
+}
 
 // Initialize Firestore
-export const db = getFirestore(app);
+let db;
+try {
+  db = getFirestore(app);
+  console.log('✅ Firestore initialized successfully');
+} catch (error) {
+  console.error('❌ Firestore initialization failed:', error);
+  throw error;
+}
 
 // Initialize Storage
-export const storage = getStorage(app);
+let storage;
+try {
+  storage = getStorage(app);
+  console.log('✅ Firebase Storage initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase Storage initialization failed:', error);
+  throw error;
+}
 
+// Connect to emulators in development (if needed)
+if (__DEV__) {
+  // Uncomment these lines if you want to use Firebase emulators
+  // try {
+  //   connectFirestoreEmulator(db, 'localhost', 8080);
+  //   connectStorageEmulator(storage, 'localhost', 9199);
+  //   console.log('✅ Connected to Firebase emulators');
+  // } catch (error) {
+  //   console.log('ℹ️ Firebase emulators not available');
+  // }
+}
+
+export { auth, db, storage };
 export default app;
 
 // Database schema types
@@ -36,6 +67,14 @@ export interface Profile {
   phoneNumber: string;
   email: string;
   walletBalance: number;
+  isVerified: boolean;
+  emailVerified: boolean;
+  ghanaCardFrontUrl?: string;
+  ghanaCardBackUrl?: string;
+  selfieUrl?: string;
+  verificationStatus: 'pending' | 'submitted' | 'verified' | 'rejected';
+  verificationSubmittedAt?: Date;
+  verificationVerifiedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

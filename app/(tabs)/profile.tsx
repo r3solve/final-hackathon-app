@@ -3,7 +3,18 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
-import { User, Phone, Mail, LogOut, Wallet } from 'lucide-react-native';
+import { 
+  User, 
+  Phone, 
+  Mail, 
+  LogOut, 
+  Wallet, 
+  Shield, 
+  CheckCircle, 
+  AlertCircle,
+  Clock,
+  XCircle
+} from 'lucide-react-native';
 
 export default function Profile() {
   const { profile, user, signOut } = useAuth();
@@ -33,6 +44,23 @@ export default function Profile() {
     }).format(amount);
   };
 
+  const getVerificationStatus = () => {
+    if (!profile) return { status: 'unknown', text: 'Unknown', color: '#6B7280', icon: Shield };
+    
+    switch (profile.verificationStatus) {
+      case 'verified':
+        return { status: 'verified', text: 'Verified', color: '#22C55E', icon: CheckCircle };
+      case 'submitted':
+        return { status: 'submitted', text: 'Under Review', color: '#F59E0B', icon: Clock };
+      case 'rejected':
+        return { status: 'rejected', text: 'Rejected', color: '#EF4444', icon: XCircle };
+      default:
+        return { status: 'pending', text: 'Not Verified', color: '#6B7280', icon: AlertCircle };
+    }
+  };
+
+  const verificationInfo = getVerificationStatus();
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
@@ -44,13 +72,53 @@ export default function Profile() {
           <View style={styles.avatar}>
             <User size={40} color="#FFFFFF" />
           </View>
-          <Text style={styles.name}>{profile?.full_name}</Text>
+          <Text style={styles.name}>{profile?.fullName}</Text>
           <Text style={styles.joinDate}>
-            Member since {new Date(profile?.created_at || '').toLocaleDateString('en-US', {
+            Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', {
               month: 'long',
               year: 'numeric'
-            })}
+            }) : 'N/A'}
           </Text>
+        </View>
+
+        {/* Verification Status Card */}
+        <View style={styles.verificationCard}>
+          <View style={styles.verificationHeader}>
+            <verificationInfo.icon size={24} color={verificationInfo.color} />
+            <Text style={styles.verificationTitle}>Verification Status</Text>
+          </View>
+          
+          <View style={styles.verificationStatus}>
+            <Text style={[styles.verificationText, { color: verificationInfo.color }]}>
+              {verificationInfo.text}
+            </Text>
+          </View>
+
+          {verificationInfo.status === 'pending' && (
+            <TouchableOpacity
+              style={styles.verifyButton}
+              onPress={() => router.push('/(tabs)/verification')}
+            >
+              <Shield size={20} color="#FFFFFF" />
+              <Text style={styles.verifyButtonText}>Complete Verification</Text>
+            </TouchableOpacity>
+          )}
+
+          {verificationInfo.status === 'rejected' && (
+            <TouchableOpacity
+              style={styles.verifyButton}
+              onPress={() => router.push('/(tabs)/verification')}
+            >
+              <Shield size={20} color="#FFFFFF" />
+              <Text style={styles.verifyButtonText}>Resubmit Verification</Text>
+            </TouchableOpacity>
+          )}
+
+          {verificationInfo.status === 'submitted' && (
+            <Text style={styles.verificationMessage}>
+              Your verification documents are under review. This usually takes 24-48 hours.
+            </Text>
+          )}
         </View>
 
         <View style={styles.infoSection}>
@@ -61,7 +129,7 @@ export default function Profile() {
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Wallet Balance</Text>
               <Text style={styles.infoValue}>
-                {formatCurrency(profile?.wallet_balance || 0)}
+                {formatCurrency(profile?.walletBalance || 0)}
               </Text>
             </View>
           </View>
@@ -72,7 +140,7 @@ export default function Profile() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Phone Number</Text>
-              <Text style={styles.infoValue}>{profile?.phone_number}</Text>
+              <Text style={styles.infoValue}>{profile?.phoneNumber}</Text>
             </View>
           </View>
 
@@ -83,6 +151,18 @@ export default function Profile() {
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{user?.email}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoItem}>
+            <View style={styles.infoIcon}>
+              <Shield size={20} color={verificationInfo.color} />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Identity Verification</Text>
+              <Text style={[styles.infoValue, { color: verificationInfo.color }]}>
+                {verificationInfo.text}
+              </Text>
             </View>
           </View>
         </View>
@@ -116,7 +196,7 @@ const styles = StyleSheet.create({
   profileCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 24,
     padding: 32,
     borderRadius: 16,
     alignItems: 'center',
@@ -144,6 +224,57 @@ const styles = StyleSheet.create({
   joinDate: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  verificationCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    padding: 24,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  verificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  verificationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  verificationStatus: {
+    marginBottom: 16,
+  },
+  verificationText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  verifyButton: {
+    backgroundColor: '#22C55E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
+  },
+  verifyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  verificationMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   infoSection: {
     paddingHorizontal: 24,
