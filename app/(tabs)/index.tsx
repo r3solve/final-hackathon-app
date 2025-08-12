@@ -13,7 +13,8 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Eye, EyeOff, ArrowUpRight, ArrowDownLeft } from 'lucide-react-native';
+import { Eye, EyeOff, ArrowUpRight, ArrowDownLeft, Send, Activity, Plus, AlertCircle } from 'lucide-react-native';
+import { router } from 'expo-router';
 
 interface Transaction {
   id: string;
@@ -29,6 +30,7 @@ export default function Wallet() {
   const [showBalance, setShowBalance] = useState(true);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingTransfersCount, setPendingTransfersCount] = useState(0);
 
   const fetchRecentTransactions = async () => {
     if (!user) return;
@@ -96,20 +98,41 @@ export default function Wallet() {
     }
   };
 
+  const fetchPendingTransfersCount = async () => {
+    if (!user) return;
+
+    try {
+      const pendingQuery = query(
+        collection(db, 'transferRequests'),
+        where('senderId', '==', user.uid),
+        where('status', 'in', ['pending', 'verified'])
+      );
+
+      const snapshot = await getDocs(pendingQuery);
+      setPendingTransfersCount(snapshot.size);
+    } catch (error) {
+      console.error('Error fetching pending transfers count:', error);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchRecentTransactions();
+    await Promise.all([
+      fetchRecentTransactions(),
+      fetchPendingTransfersCount()
+    ]);
     setRefreshing(false);
   };
 
   useEffect(() => {
     fetchRecentTransactions();
+    fetchPendingTransfersCount();
   }, [user]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-GH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'GHS',
     }).format(amount);
   };
 
@@ -146,6 +169,46 @@ export default function Wallet() {
           <Text style={styles.balance}>
             {showBalance ? formatCurrency(profile?.walletBalance || 0) : '••••••'}
           </Text>
+        </View>
+
+        <View style={styles.quickActions}>
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => router.push('/(tabs)/send')}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#EFF6FF' }]}>
+              <Send size={24} color="#3B82F6" />
+            </View>
+            <Text style={styles.actionTitle}>Send</Text>
+            <Text style={styles.actionSubtitle}>Send money</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => router.push('/(tabs)/transactions')}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}>
+              <Activity size={24} color="#22C55E" />
+              {pendingTransfersCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingTransfersCount}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.actionTitle}>Activity</Text>
+            <Text style={styles.actionSubtitle}>View history</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => router.push('/deposit')}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Plus size={24} color="#F59E0B" />
+            </View>
+            <Text style={styles.actionTitle}>Deposit</Text>
+            <Text style={styles.actionSubtitle}>Add money</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -243,6 +306,61 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '800',
     color: '#1F2937',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginHorizontal: 24,
+    marginBottom: 32,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionCard: {
+    alignItems: 'center',
+    width: '33%', // Three cards in a row
+  },
+  actionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  actionSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   section: {
     paddingHorizontal: 24,

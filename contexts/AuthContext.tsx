@@ -17,6 +17,7 @@ import {
   collection, 
   getDocs 
 } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db, Profile } from '@/lib/firebase';
 
 interface AuthContextType {
@@ -39,17 +40,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔐 Setting up auth state listener...');
+    
+    // Load cached profile data on app start
+    const loadCachedProfile = async () => {
+      try {
+        const cachedProfile = await AsyncStorage.getItem('userProfile');
+        if (cachedProfile) {
+          const parsedProfile = JSON.parse(cachedProfile);
+          console.log('📱 Loaded cached profile data');
+          setProfile(parsedProfile);
+        }
+      } catch (error) {
+        console.error('Error loading cached profile:', error);
+      }
+    };
+
+    // Load cached data first
+    loadCachedProfile();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('🔐 Auth state changed:', user ? `User logged in: ${user.email}` : 'No user');
       setUser(user);
       if (user) {
         // Check if email is verified before fetching profile
         if (user.emailVerified) {
+          console.log('✅ Email verified, fetching profile...');
           await fetchProfile(user.uid);
         } else {
+          console.log('⚠️ Email not verified yet');
           setProfile(null);
           setLoading(false);
         }
       } else {
+        console.log('🚪 User logged out');
         setProfile(null);
         setLoading(false);
       }
@@ -63,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profileDoc = await getDoc(doc(db, 'profiles', userId));
       if (profileDoc.exists()) {
         const data = profileDoc.data();
-        setProfile({
+        const profileData = {
           id: profileDoc.id,
           fullName: data.fullName,
           phoneNumber: data.phoneNumber,
@@ -79,7 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           verificationVerifiedAt: data.verificationVerifiedAt?.toDate(),
           createdAt: data.createdAt.toDate(),
           updatedAt: data.updatedAt.toDate(),
-        });
+        };
+        
+        // Store profile data in AsyncStorage for persistence
+        await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+        setProfile(profileData);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -115,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName,
         phoneNumber,
         email,
-        walletBalance: 100.00, // Starting balance
+        walletBalance: 100.00, // Starting balance in GHS
         isVerified: false,
         emailVerified: false,
         verificationStatus: 'pending',
@@ -151,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: user.displayName || '',
         phoneNumber: '', // Will be updated from existing profile
         email: user.email,
-        walletBalance: 100.00,
+        walletBalance: 100.00, // Starting balance in GHS
         isVerified: false,
         emailVerified: true,
         verificationStatus: 'pending',
@@ -186,6 +214,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    try {
+      // Clear cached profile data on logout
+      await AsyncStorage.removeItem('userProfile');
+      console.log('🗑️ Cleared cached profile data on logout');
+    } catch (error) {
+      console.error('Error clearing cached profile:', error);
+    }
     await firebaseSignOut(auth);
   };
 
@@ -200,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await updateDoc(doc(db, 'profiles', user.uid), updateData);
 
-      // Refresh profile
+      // Refresh profile and update cache
       await fetchProfile(user.uid);
       return {};
     } catch (error: any) {

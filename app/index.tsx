@@ -7,10 +7,13 @@ export default function Index() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
+    console.log('🔄 App routing - Loading:', loading, 'User:', user ? user.email : 'None');
     if (!loading) {
       if (user) {
+        console.log('✅ User authenticated, navigating to tabs');
         router.replace('/(tabs)');
       } else {
+        console.log('❌ No user, navigating to welcome');
         router.replace('/(auth)/welcome');
       }
     }
