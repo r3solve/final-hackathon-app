@@ -97,7 +97,7 @@ export default function Profile() {
           {verificationInfo.status === 'pending' && (
             <TouchableOpacity
               style={styles.verifyButton}
-              onPress={() => router.push('/(tabs)/verification')}
+              onPress={() => router.push('/(tabs)/document-upload')}
             >
               <Shield size={20} color="#FFFFFF" />
               <Text style={styles.verifyButtonText}>Complete Verification</Text>
@@ -107,7 +107,7 @@ export default function Profile() {
           {verificationInfo.status === 'rejected' && (
             <TouchableOpacity
               style={styles.verifyButton}
-              onPress={() => router.push('/(tabs)/verification')}
+              onPress={() => router.push('/(tabs)/document-upload')}
             >
               <Shield size={20} color="#FFFFFF" />
               <Text style={styles.verifyButtonText}>Resubmit Verification</Text>
@@ -165,6 +165,20 @@ export default function Profile() {
               </Text>
             </View>
           </View>
+
+          {profile?.ghanaCardNumber && (
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Shield size={20} color="#22C55E" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Ghana Card Number</Text>
+                <Text style={styles.infoValue}>
+                  {profile.ghanaCardNumber}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.actions}>

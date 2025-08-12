@@ -69,6 +69,7 @@ export interface Profile {
   walletBalance: number;
   isVerified: boolean;
   emailVerified: boolean;
+  ghanaCardNumber?: string;
   ghanaCardFrontUrl?: string;
   ghanaCardBackUrl?: string;
   selfieUrl?: string;

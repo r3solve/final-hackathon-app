@@ -67,6 +67,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="document-upload"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="selfie-capture"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="verify/[id]"
         options={{
           href: null,
