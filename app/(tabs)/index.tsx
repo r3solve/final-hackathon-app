@@ -32,11 +32,7 @@ export default function Wallet() {
   const [refreshing, setRefreshing] = useState(false);
   const [pendingTransfersCount, setPendingTransfersCount] = useState(0);
 
-  // Debug: Log profile state changes
-  useEffect(() => {
-    console.log('🏠 Home screen - Profile state changed:', profile);
-    console.log('🏠 Home screen - User state:', user);
-  }, [profile, user]);
+
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -184,12 +180,6 @@ export default function Wallet() {
             <Text style={styles.welcomeText}>Welcome to PayFlow Ghana</Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity 
-              style={styles.debugButton}
-              onPress={refreshProfile}
-            >
-              <Text style={styles.debugButtonText}>🔄</Text>
-            </TouchableOpacity>
             <TouchableOpacity 
               style={styles.notificationButton}
               onPress={() => router.push('/(tabs)/notifications')}
@@ -421,13 +411,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  debugButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-  debugButtonText: {
-    fontSize: 20,
-  },
+
   greeting: {
     fontSize: 16,
     color: '#6B7280',

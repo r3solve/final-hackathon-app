@@ -1,340 +1,224 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/contexts/AuthContext';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  addDoc 
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { DollarSign, Phone, Shield, Info, CheckCircle, CreditCard, Plus } from 'lucide-react-native';
+import { ArrowLeft, Send, User, Phone, DollarSign } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import PINVerificationModal from '@/components/PINVerificationModal';
 
 export default function Send() {
-  const { user, profile, canSendMoney } = useAuth();
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const { profile } = useAuth();
+  const [recipientPhone, setRecipientPhone] = useState('');
   const [amount, setAmount] = useState('');
-  const [requireVerification, setRequireVerification] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [note, setNote] = useState('');
+  const [showPINModal, setShowPINModal] = useState(false);
 
-  // Check if user can send money
-  if (!canSendMoney()) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Send Money</Text>
-            <Text style={styles.subtitle}>Transfer funds securely to friends and family</Text>
-          </View>
+  const handleSendMoney = () => {
+    if (!recipientPhone.trim()) {
+      Alert.alert('Error', 'Please enter recipient phone number');
+      return;
+    }
 
-          <View style={styles.verificationRequiredCard}>
-            <View style={styles.verificationRequiredIcon}>
-              <Shield size={48} color="#F59E0B" />
-            </View>
-            <Text style={styles.verificationRequiredTitle}>Verification Required</Text>
-            <Text style={styles.verificationRequiredMessage}>
-              You need to complete your identity verification before you can send money. This helps us ensure the security of all transactions.
-            </Text>
-            <TouchableOpacity
-              style={styles.verificationRequiredButton}
-              onPress={() => router.push('/(tabs)/document-upload')}
-            >
-              <Shield size={20} color="#FFFFFF" />
-              <Text style={styles.verificationRequiredButtonText}>Complete Verification</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+    if (!amount || parseFloat(amount) <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
+
+    const amountValue = parseFloat(amount);
+    if (amountValue < 1) {
+      Alert.alert('Error', 'Minimum amount is ₵1.00');
+      return;
+    }
+
+    if (amountValue > 10000) {
+      Alert.alert('Error', 'Maximum amount is ₵10,000.00');
+      return;
+    }
+
+    if (profile && amountValue > profile.walletBalance) {
+      Alert.alert('Insufficient Balance', 'You do not have enough balance to send this amount');
+      return;
+    }
+
+    // Show PIN verification modal
+    setShowPINModal(true);
+  };
+
+  const handlePINVerificationSuccess = () => {
+    // PIN verified successfully - proceed with money transfer
+    Alert.alert(
+      'Transfer Successful!',
+      `You have successfully sent ₵${parseFloat(amount).toFixed(2)} to ${recipientPhone}`,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form
+            setRecipientPhone('');
+            setAmount('');
+            setNote('');
+            // Navigate back to profile
+            router.back();
+          },
+        },
+      ]
     );
-  }
-
-  const validateInputs = () => {
-    if (!phoneNumber.trim()) return 'Phone number is required';
-    if (!amount.trim()) return 'Amount is required';
-    
-    // Validate Ghana phone number format
-    const phoneRegex = /^\+233[0-9]{9}$/;
-    if (!phoneRegex.test(phoneNumber.trim())) {
-      return 'Please enter a valid Ghana phone number (e.g., +233501234567)';
-    }
-    
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return 'Amount must be a positive number';
-    if (numAmount > (profile?.walletBalance || 0)) return 'Insufficient funds';
-    
-    return null;
   };
 
-  const formatPhoneNumber = (text: string) => {
-    // Remove all non-digit characters except +
-    let cleaned = text.replace(/[^\d+]/g, '');
-    
-    // Ensure it starts with +233
-    if (!cleaned.startsWith('+233')) {
-      if (cleaned.startsWith('233')) {
-        cleaned = '+' + cleaned;
-      } else if (cleaned.startsWith('0')) {
-        cleaned = '+233' + cleaned.substring(1);
-      } else if (cleaned.startsWith('+')) {
-        // Keep as is
-      } else {
-        cleaned = '+233' + cleaned;
-      }
-    }
-    
-    // Limit to +233 + 9 digits
-    if (cleaned.length > 13) {
-      cleaned = cleaned.substring(0, 13);
-    }
-    
-    return cleaned;
+  const handleBackToProfile = () => {
+    router.back();
   };
 
-  const handleSendMoney = async () => {
-    const validationError = validateInputs();
-    if (validationError) {
-      Alert.alert('Validation Error', validationError);
-      return;
-    }
-
-    if (!user || !profile) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Find recipient by phone number
-      const recipientQuery = query(
-        collection(db, 'profiles'),
-        where('phoneNumber', '==', phoneNumber.trim())
-      );
-      const recipientSnapshot = await getDocs(recipientQuery);
-
-      if (recipientSnapshot.empty) {
-        Alert.alert('Error', 'Recipient not found. Please check the phone number.');
-        setLoading(false);
-        return;
-      }
-
-      const recipientDoc = recipientSnapshot.docs[0];
-      const recipientData = recipientDoc.data();
-
-      if (recipientDoc.id === user.uid) {
-        Alert.alert('Error', 'You cannot send money to yourself');
-        setLoading(false);
-        return;
-      }
-
-      // Create transfer request
-      const transferData = {
-        senderId: user.uid,
-        recipientId: recipientDoc.id,
-        amount: parseFloat(amount),
-        status: requireVerification ? 'pending' : 'completed',
-        requireVerification: requireVerification,
-        createdAt: new Date(),
-        senderName: profile.fullName,
-        recipientName: recipientData.fullName,
-        senderPhone: profile.phoneNumber,
-        recipientPhone: recipientData.phoneNumber,
-      };
-
-      await addDoc(collection(db, 'transferRequests'), transferData);
-
-      // If no verification required, create transaction immediately
-      if (!requireVerification) {
-        await addDoc(collection(db, 'transactions'), {
-          senderId: user.uid,
-          recipientId: recipientDoc.id,
-          amount: parseFloat(amount),
-          type: 'transfer',
-          status: 'completed',
-          createdAt: new Date(),
-          senderName: profile.fullName,
-          recipientName: recipientData.fullName,
-        });
-      }
-
-      const successMessage = requireVerification 
-        ? `Your transfer request of ${formatCurrency(parseFloat(amount))} to ${recipientData.fullName} has been sent. They will need to verify their identity before the transfer is completed.`
-        : `Successfully sent ${formatCurrency(parseFloat(amount))} to ${recipientData.fullName}. The transfer has been completed immediately.`;
-
-      Alert.alert(
-        requireVerification ? 'Transfer Request Sent' : 'Transfer Completed',
-        successMessage,
-        [{ text: 'OK', onPress: () => {
-          setPhoneNumber('');
-          setAmount('');
-          setRequireVerification(true);
-        }}]
-      );
-
-    } catch (error: any) {
-      console.error('Send money error:', error);
-      Alert.alert('Error', 'Failed to send money. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GH', {
-      style: 'currency',
-      currency: 'GHS',
-    }).format(amount);
+  const formatAmount = (value: string) => {
+    if (!value) return '';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '';
+    return num.toFixed(2);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Send Money</Text>
-          <Text style={styles.subtitle}>Transfer funds securely to friends and family</Text>
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBackToProfile}
+        >
+          <ArrowLeft size={24} color="#374151" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Send Money</Text>
+        <View style={styles.headerRight} />
+      </View>
 
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.balanceCard}>
-          <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>Available Balance</Text>
-            <View style={styles.balanceIcon}>
-              <DollarSign size={20} color="#22C55E" />
-            </View>
-          </View>
-          <Text style={styles.balance}>
-            {formatCurrency(profile?.walletBalance || 0)}
+          <Text style={styles.balanceLabel}>Available Balance</Text>
+          <Text style={styles.balanceAmount}>
+            ₵{profile?.walletBalance ? profile.walletBalance.toFixed(2) : '0.00'}
           </Text>
-          <TouchableOpacity
-            style={styles.depositButton}
-            onPress={() => router.push('/(tabs)/deposit')}
-          >
-            <Plus size={16} color="#FFFFFF" />
-            <Text style={styles.depositButtonText}>Deposit Money</Text>
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Recipient Phone Number</Text>
-            <View style={styles.inputContainer}>
-              <Phone size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={phoneNumber}
-                onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
-                placeholder="e.g., +233501234567"
-                keyboardType="phone-pad"
-                maxLength={13}
-              />
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Recipient Details</Text>
+          
+          <View style={styles.inputContainer}>
+            <View style={styles.inputIcon}>
+              <Phone size={20} color="#6B7280" />
             </View>
-            <Text style={styles.helperText}>
-              Enter Ghana phone number starting with +233
-            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Recipient phone number"
+              value={recipientPhone}
+              onChangeText={setRecipientPhone}
+              keyboardType="phone-pad"
+              autoFocus={true}
+            />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Amount (GHS)</Text>
-            <View style={styles.inputContainer}>
-              <DollarSign size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="e.g., 0.00"
-                keyboardType="decimal-pad"
-              />
+          <Text style={styles.inputNote}>
+            Enter the phone number of the person you want to send money to
+          </Text>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Transfer Amount</Text>
+          
+          <View style={styles.amountInputContainer}>
+            <View style={styles.currencyIcon}>
+              <DollarSign size={24} color="#22C55E" />
             </View>
+            <TextInput
+              style={styles.amountInput}
+              placeholder="0.00"
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+            />
           </View>
 
-          <View style={styles.verificationSection}>
-            <View style={styles.verificationHeader}>
-              <View style={styles.verificationIcon}>
-                <Shield size={20} color={requireVerification ? "#22C55E" : "#9CA3AF"} />
+          <Text style={styles.inputNote}>
+            Minimum: ₵1.00 | Maximum: ₵10,000.00
+          </Text>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Note (Optional)</Text>
+          
+          <View style={styles.inputContainer}>
+            <View style={styles.inputIcon}>
+              <User size={20} color="#6B7280" />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Add a note for this transfer"
+              value={note}
+              onChangeText={setNote}
+              multiline={true}
+              numberOfLines={3}
+            />
+          </View>
+        </View>
+
+        {amount && parseFloat(amount) > 0 && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Transfer Summary</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Recipient:</Text>
+              <Text style={styles.summaryValue}>{recipientPhone}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Amount:</Text>
+              <Text style={styles.summaryValue}>₵{formatAmount(amount)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Fee:</Text>
+              <Text style={styles.summaryValue}>₵0.00</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total:</Text>
+              <Text style={styles.summaryTotal}>₵{formatAmount(amount)}</Text>
+            </View>
+            {note && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Note:</Text>
+                <Text style={styles.summaryValue}>{note}</Text>
               </View>
-              <View style={styles.verificationContent}>
-                <Text style={styles.verificationTitle}>Require Identity Verification</Text>
-                <Text style={styles.verificationSubtitle}>
-                  {requireVerification 
-                    ? 'Recipient must verify identity before transfer'
-                    : 'Transfer will be completed immediately'
-                  }
-                </Text>
-              </View>
-              <Switch
-                value={requireVerification}
-                onValueChange={setRequireVerification}
-                trackColor={{ false: '#E5E7EB', true: '#D1FAE5' }}
-                thumbColor={requireVerification ? '#22C55E' : '#9CA3AF'}
-              />
-            </View>
+            )}
           </View>
+        )}
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSendMoney}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Processing...' : 'Send Money'}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.sendButton,
+            (!recipientPhone.trim() || !amount || parseFloat(amount) <= 0) && styles.sendButtonDisabled
+          ]}
+          onPress={handleSendMoney}
+          disabled={!recipientPhone.trim() || !amount || parseFloat(amount) <= 0}
+        >
+          <Send size={20} color="#FFFFFF" />
+          <Text style={styles.sendButtonText}>Send Money</Text>
+        </TouchableOpacity>
 
-          <View style={styles.infoSection}>
-            <View style={styles.infoHeader}>
-              <Info size={16} color="#3B82F6" />
-              <Text style={styles.infoTitle}>How it works</Text>
-            </View>
-            <View style={styles.infoContent}>
-              {requireVerification ? (
-                <>
-                  <View style={styles.infoRow}>
-                    <CheckCircle size={16} color="#22C55E" />
-                    <Text style={styles.infoText}>
-                      Transfer request is sent to recipient
-                    </Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <CheckCircle size={16} color="#22C55E" />
-                    <Text style={styles.infoText}>
-                      Recipient must verify identity with selfie
-                    </Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <CheckCircle size={16} color="#22C55E" />
-                    <Text style={styles.infoText}>
-                      Money is transferred after verification
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View style={styles.infoRow}>
-                    <CheckCircle size={16} color="#22C55E" />
-                    <Text style={styles.infoText}>
-                      Money is transferred immediately
-                    </Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <CheckCircle size={16} color="#22C55E" />
-                    <Text style={styles.infoText}>
-                      No verification required
-                    </Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <CheckCircle size={16} color="#22C55E" />
-                    <Text style={styles.infoText}>
-                      Instant transfer to recipient
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>Important Information</Text>
+          <Text style={styles.infoText}>
+            • Transfers are instant and cannot be reversed{'\n'}
+            • Make sure you have the correct phone number{'\n'}
+            • No fees for transfers{'\n'}
+            • Recipient will receive an SMS notification
+          </Text>
         </View>
       </ScrollView>
+
+      {/* PIN Verification Modal */}
+      <PINVerificationModal
+        visible={showPINModal}
+        onClose={() => setShowPINModal(false)}
+        onSuccess={handlePINVerificationSuccess}
+        title="Verify Your PIN"
+        subtitle="Enter your 4-digit PIN to confirm this transfer"
+        amount={amount}
+        operation="send"
+      />
     </SafeAreaView>
   );
 }
@@ -342,261 +226,181 @@ export default function Send() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#1F2937',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 4,
+  headerRight: {
+    width: 40,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
   },
   balanceCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    marginBottom: 32,
-    padding: 20,
+    backgroundColor: '#F0FDF4',
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  balanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    padding: 24,
+    marginTop: 24,
+    marginBottom: 32,
     alignItems: 'center',
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#22C55E',
   },
   balanceLabel: {
     fontSize: 14,
-    color: '#6B7280',
     fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 8,
   },
-  balanceIcon: {
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: '#E0F2FE',
-  },
-  balance: {
-    fontSize: 24,
+  balanceAmount: {
+    fontSize: 32,
     fontWeight: '700',
     color: '#22C55E',
-    marginTop: 4,
   },
-  depositButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#22C55E',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 16,
-    gap: 8,
+  formSection: {
+    marginBottom: 24,
   },
-  depositButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '600',
-  },
-  form: {
-    paddingHorizontal: 24,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
+    color: '#1F2937',
+    marginBottom: 16,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 16,
     fontSize: 16,
+    color: '#1F2937',
   },
-  helperText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  verificationSection: {
-    marginTop: 20,
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-  },
-  verificationHeader: {
+  amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  verificationIcon: {
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: '#E0F2FE',
+  currencyIcon: {
+    marginRight: 12,
   },
-  verificationContent: {
+  amountInput: {
     flex: 1,
-    marginLeft: 12,
-  },
-  verificationTitle: {
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: '600',
     color: '#1F2937',
   },
-  verificationSubtitle: {
+  inputNote: {
     fontSize: 14,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
-  button: {
-    backgroundColor: '#22C55E',
-    paddingVertical: 16,
+  summaryCard: {
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  buttonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  buttonText: {
-    color: '#FFFFFF',
+  summaryTitle: {
     fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  summaryTotal: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#22C55E',
+  },
+  sendButton: {
+    backgroundColor: '#22C55E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginBottom: 32,
+    gap: 8,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  sendButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
   infoSection: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    padding: 20,
+    marginBottom: 32,
   },
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#92400E',
-    marginLeft: 8,
-  },
-  infoContent: {
-    //
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    color: '#1F2937',
+    marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#92400E',
-    marginLeft: 8,
-  },
-  verificationRequiredCard: {
-    backgroundColor: '#FFFBEB',
-    marginHorizontal: 24,
-    marginBottom: 32,
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  verificationRequiredIcon: {
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#FDE68A',
-  },
-  verificationRequiredTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#92400E',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  verificationRequiredMessage: {
-    fontSize: 14,
-    color: '#92400E',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  verificationRequiredButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F59E0B',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-  },
-  verificationRequiredButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
     color: '#6B7280',
-  },
-  paymentMethodsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  paymentMethodsButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8B5CF6',
+    lineHeight: 20,
   },
 });

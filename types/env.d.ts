@@ -1,14 +1,55 @@
-declare global {
-  namespace NodeJS {
-    interface ProcessEnv {
-      EXPO_PUBLIC_FIREBASE_API_KEY: string;
-      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: string;
-      EXPO_PUBLIC_FIREBASE_PROJECT_ID: string;
-      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: string;
-      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: string;
-      EXPO_PUBLIC_FIREBASE_APP_ID: string;
-    }
-  }
+/// <reference types="nativewind/types" />
+
+declare module "*.png" {
+  const value: any;
+  export = value;
 }
 
-export {};
+// PIN Authentication Types
+export interface PINData {
+  pin: string;
+  createdAt: Date;
+  lastUsed: Date;
+  isSet: boolean;
+}
+
+export interface PINVerificationResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface PINCreationResult {
+  success: boolean;
+  error?: string;
+}
+
+// Profile Types
+export interface Profile {
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  walletBalance: number;
+  isVerified: boolean;
+  verificationStatus: 'pending' | 'approved' | 'rejected';
+  profileImageUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Group Payment Types
+export interface GroupMember {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  amount: number;
+}
+
+export interface PaymentGroup {
+  id: string;
+  name: string;
+  description: string;
+  members: GroupMember[];
+  totalAmount: number;
+  createdAt: Date;
+  createdBy: string;
+}
