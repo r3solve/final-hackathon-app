@@ -129,71 +129,29 @@ export default function VerifyTransfer() {
       // Upload selfie to Firebase Storage
       const selfieUrl = await uploadSelfie(selfieUri);
 
-      // Complete the transfer using a transaction
-      await runTransaction(db, async (transaction) => {
-        // Get current balances
-        const senderDoc = await transaction.get(doc(db, 'profiles', transferRequest.senderId));
-        const recipientDoc = await transaction.get(doc(db, 'profiles', transferRequest.recipientId));
-        
-        if (!senderDoc.exists() || !recipientDoc.exists()) {
-          throw new Error('User profiles not found');
-        }
-
-        const senderData = senderDoc.data();
-        const recipientData = recipientDoc.data();
-
-        // Check if sender has sufficient funds
-        if (senderData.walletBalance < transferRequest.amount) {
-          throw new Error('Insufficient funds');
-        }
-
-        // Update balances
-        transaction.update(doc(db, 'profiles', transferRequest.senderId), {
-          walletBalance: senderData.walletBalance - transferRequest.amount,
-          updatedAt: new Date(),
-        });
-
-        transaction.update(doc(db, 'profiles', transferRequest.recipientId), {
-          walletBalance: recipientData.walletBalance + transferRequest.amount,
-          updatedAt: new Date(),
-        });
-
-        // Update transfer request
-        transaction.update(doc(db, 'transferRequests', id), {
-          status: 'completed',
-          verificationSelfieUrl: selfieUrl,
-          verificationLocation: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            timestamp: location.timestamp,
-          },
-          verifiedAt: new Date(),
-          completedAt: new Date(),
-        });
-
-        // Create transaction record
-        const transactionRef = doc(collection(db, 'transactions'));
-        transaction.set(transactionRef, {
-          transferRequestId: id,
-          senderId: transferRequest.senderId,
-          recipientId: transferRequest.recipientId,
-          amount: transferRequest.amount,
-          description: '',
-          createdAt: new Date(),
-        });
+      // Update transfer request status to 'verified' (not completed yet)
+      await updateDoc(doc(db, 'transferRequests', id), {
+        status: 'verified',
+        verificationSelfieUrl: selfieUrl,
+        verificationLocation: {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          timestamp: location.timestamp,
+        },
+        verifiedAt: new Date(),
       });
 
       Alert.alert(
-        'Transfer Completed',
-        `You have successfully received ${new Intl.NumberFormat('en-US', {
+        'Verification Complete',
+        `Your verification has been submitted successfully. The sender will now review your details and approve the transfer of ${new Intl.NumberFormat('en-GH', {
           style: 'currency',
-          currency: 'USD',
-        }).format(transferRequest.amount)} from ${transferRequest.sender.fullName}`,
+          currency: 'GHS',
+        }).format(transferRequest.amount)}.`,
         [{ text: 'OK', onPress: () => router.push('/(tabs)') }]
       );
 
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to complete transfer');
+      Alert.alert('Error', error.message || 'Failed to submit verification');
     } finally {
       setLoading(false);
     }
@@ -274,9 +232,9 @@ export default function VerifyTransfer() {
         <View style={styles.transferCard}>
           <Text style={styles.transferTitle}>Incoming Transfer</Text>
           <Text style={styles.transferAmount}>
-            {new Intl.NumberFormat('en-US', {
+            {new Intl.NumberFormat('en-GH', {
               style: 'currency',
-              currency: 'USD',
+              currency: 'GHS',
             }).format(transferRequest.amount)}
           </Text>
           <Text style={styles.transferFrom}>
@@ -365,7 +323,7 @@ export default function VerifyTransfer() {
             disabled={!selfieUri || !location || loading}
           >
             <Text style={styles.approveButtonText}>
-              {loading ? 'Processing...' : 'Approve Transfer'}
+              {loading ? 'Processing...' : 'Submit Verification'}
             </Text>
           </TouchableOpacity>
 

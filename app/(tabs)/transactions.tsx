@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -9,17 +9,40 @@ import {
   orderBy, 
   getDocs,
   doc,
-  getDoc
+  getDoc,
+  updateDoc,
+  runTransaction,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { router } from 'expo-router';
-import { ArrowUpRight, ArrowDownLeft, Clock, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  Clock, 
+  CircleCheck as CheckCircle, 
+  User, 
+  MapPin, 
+  Camera, 
+  XCircle, 
+  ArrowRight 
+} from 'lucide-react-native';
 
 interface TransferRequest {
   id: string;
+  senderId: string;
+  recipientId: string;
   amount: number;
-  status: string;
+  status: 'pending' | 'verified' | 'approved' | 'completed' | 'cancelled';
+  verificationSelfieUrl?: string;
+  verificationLocation?: {
+    latitude: number;
+    longitude: number;
+    timestamp: number;
+  };
   createdAt: Date;
+  verifiedAt?: Date;
+  completedAt?: Date;
   senderName: string;
   recipientName: string;
   type: 'sent' | 'received';
@@ -39,6 +62,7 @@ export default function Transactions() {
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const fetchData = async () => {
     if (!user) return;
@@ -74,9 +98,15 @@ export default function Transactions() {
         
         allRequests.push({
           id: docSnapshot.id,
+          senderId: data.senderId,
+          recipientId: data.recipientId,
           amount: data.amount,
           status: data.status,
+          verificationSelfieUrl: data.verificationSelfieUrl,
+          verificationLocation: data.verificationLocation,
           createdAt: data.createdAt.toDate(),
+          verifiedAt: data.verifiedAt?.toDate(),
+          completedAt: data.completedAt?.toDate(),
           senderName: '',
           recipientName: recipientData?.fullName || 'Unknown',
           type: 'sent',
@@ -91,9 +121,15 @@ export default function Transactions() {
         
         allRequests.push({
           id: docSnapshot.id,
+          senderId: data.senderId,
+          recipientId: data.recipientId,
           amount: data.amount,
           status: data.status,
+          verificationSelfieUrl: data.verificationSelfieUrl,
+          verificationLocation: data.verificationLocation,
           createdAt: data.createdAt.toDate(),
+          verifiedAt: data.verifiedAt?.toDate(),
+          completedAt: data.completedAt?.toDate(),
           senderName: senderData?.fullName || 'Unknown',
           recipientName: '',
           type: 'received',
@@ -169,12 +205,28 @@ export default function Transactions() {
 
   useEffect(() => {
     fetchData();
+
+    // Set up real-time listener for transfer updates
+    if (user) {
+      const transfersQuery = query(
+        collection(db, 'transferRequests'),
+        where('senderId', '==', user.uid),
+        where('status', 'in', ['pending', 'verified'])
+      );
+
+      const unsubscribe = onSnapshot(transfersQuery, (snapshot) => {
+        // Refetch data when there are changes
+        fetchData();
+      });
+
+      return () => unsubscribe();
+    }
   }, [user]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-GH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'GHS',
     }).format(amount);
   };
 
@@ -206,6 +258,117 @@ export default function Transactions() {
     }
   };
 
+  const handleApproveTransfer = async (transfer: TransferRequest) => {
+    if (!transfer.verificationSelfieUrl || !transfer.verificationLocation) {
+      Alert.alert('Verification Required', 'The recipient must complete their verification before you can approve the transfer.');
+      return;
+    }
+
+    Alert.alert(
+      'Approve Transfer',
+      `Are you sure you want to approve the transfer of ${formatCurrency(transfer.amount)} to ${transfer.recipientName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          style: 'default',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await runTransaction(db, async (transaction) => {
+                // Get current balances
+                const senderDoc = await transaction.get(doc(db, 'profiles', transfer.senderId));
+                const recipientDoc = await transaction.get(doc(db, 'profiles', transfer.recipientId));
+                
+                if (!senderDoc.exists() || !recipientDoc.exists()) {
+                  throw new Error('User profiles not found');
+                }
+
+                const senderData = senderDoc.data();
+                const recipientData = recipientDoc.data();
+
+                // Check if sender has sufficient funds
+                if (senderData.walletBalance < transfer.amount) {
+                  throw new Error('Insufficient funds');
+                }
+
+                // Update balances
+                transaction.update(doc(db, 'profiles', transfer.senderId), {
+                  walletBalance: senderData.walletBalance - transfer.amount,
+                  updatedAt: new Date(),
+                });
+
+                transaction.update(doc(db, 'profiles', transfer.recipientId), {
+                  walletBalance: recipientData.walletBalance + transfer.amount,
+                  updatedAt: new Date(),
+                });
+
+                // Update transfer request
+                transaction.update(doc(db, 'transferRequests', transfer.id), {
+                  status: 'completed',
+                  completedAt: new Date(),
+                });
+
+                // Create transaction record
+                const transactionRef = doc(collection(db, 'transactions'));
+                transaction.set(transactionRef, {
+                  transferRequestId: transfer.id,
+                  senderId: transfer.senderId,
+                  recipientId: transfer.recipientId,
+                  amount: transfer.amount,
+                  description: `Transfer to ${transfer.recipientName}`,
+                  createdAt: new Date(),
+                });
+              });
+
+              Alert.alert(
+                'Transfer Completed',
+                `Successfully transferred ${formatCurrency(transfer.amount)} to ${transfer.recipientName}`,
+                [{ text: 'OK' }]
+              );
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to complete transfer');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCancelTransfer = async (transfer: TransferRequest) => {
+    Alert.alert(
+      'Cancel Transfer',
+      `Are you sure you want to cancel the transfer of ${formatCurrency(transfer.amount)} to ${transfer.recipientName}?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'transferRequests', transfer.id), {
+                status: 'cancelled',
+                updatedAt: new Date(),
+              });
+              
+              Alert.alert('Transfer Cancelled', 'The transfer request has been cancelled.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to cancel transfer');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openMap = (location: { latitude: number; longitude: number }) => {
+    const url = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+    // In a real app, you'd use Linking.openURL(url)
+    Alert.alert('Location', `Latitude: ${location.latitude.toFixed(4)}\nLongitude: ${location.longitude.toFixed(4)}\n\nOpen in maps: ${url}`);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -223,38 +386,129 @@ export default function Transactions() {
             <Text style={styles.sectionTitle}>Pending Transfers</Text>
             <View style={styles.itemsList}>
               {transferRequests.map((request) => (
-                <TouchableOpacity
-                  key={request.id}
-                  style={styles.requestItem}
-                  onPress={() => handleTransferRequestPress(request)}
-                  disabled={!(request.type === 'received' && request.status === 'pending')}
-                >
-                  <View style={styles.requestIcon}>
-                    <Clock size={16} color={getStatusColor(request.status)} />
+                <View key={request.id} style={styles.requestCard}>
+                  <View style={styles.requestHeader}>
+                    <View style={styles.recipientInfo}>
+                      <View style={styles.avatar}>
+                        <User size={20} color="#6B7280" />
+                      </View>
+                      <View>
+                        <Text style={styles.recipientName}>
+                          {request.type === 'sent' 
+                            ? request.recipientName
+                            : request.senderName
+                          }
+                        </Text>
+                        <Text style={styles.recipientPhone}>
+                          {request.type === 'sent' ? 'Recipient' : 'Sender'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.amountContainer}>
+                      <Text style={styles.amount}>{formatCurrency(request.amount)}</Text>
+                      <Text style={styles.status}>
+                        {request.status === 'pending' ? 'Pending Verification' : 'Verified'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.requestDetails}>
-                    <Text style={styles.requestName}>
-                      {request.type === 'sent' 
-                        ? `To ${request.recipientName}`
-                        : `From ${request.senderName}`
-                      }
+
+                  <View style={styles.transferDetails}>
+                    <Text style={styles.dateText}>
+                      Requested: {formatDate(request.createdAt)}
                     </Text>
-                    <Text style={styles.requestStatus}>
-                      {request.status === 'pending' && request.type === 'received' 
-                        ? 'Tap to verify and approve'
-                        : request.status === 'pending'
-                        ? 'Waiting for recipient verification'
-                        : 'Verified - awaiting approval'
-                      }
-                    </Text>
-                    <Text style={styles.requestDate}>
-                      {formatDate(request.createdAt)}
-                    </Text>
+                    
+                    {request.verifiedAt && (
+                      <Text style={styles.dateText}>
+                        Verified: {formatDate(request.verifiedAt)}
+                      </Text>
+                    )}
                   </View>
-                  <Text style={styles.requestAmount}>
-                    {formatCurrency(request.amount)}
-                  </Text>
-                </TouchableOpacity>
+
+                  {request.status === 'verified' && request.type === 'sent' && (
+                    <View style={styles.verificationSection}>
+                      <Text style={styles.verificationTitle}>Recipient Verification</Text>
+                      
+                      <View style={styles.verificationItems}>
+                        <View style={styles.verificationItem}>
+                          <View style={styles.verificationIcon}>
+                            <Camera size={16} color="#22C55E" />
+                          </View>
+                          <Text style={styles.verificationText}>Selfie Verified</Text>
+                        </View>
+                        
+                        <View style={styles.verificationItem}>
+                          <View style={styles.verificationIcon}>
+                            <MapPin size={16} color="#22C55E" />
+                          </View>
+                          <Text style={styles.verificationText}>Location Captured</Text>
+                        </View>
+                      </View>
+
+                      {request.verificationSelfieUrl && (
+                        <View style={styles.selfieContainer}>
+                          <Text style={styles.selfieLabel}>Recipient's Selfie:</Text>
+                          <Image 
+                            source={{ uri: request.verificationSelfieUrl }} 
+                            style={styles.selfieImage}
+                          />
+                        </View>
+                      )}
+
+                      {request.verificationLocation && (
+                        <TouchableOpacity 
+                          style={styles.locationContainer}
+                          onPress={() => openMap(request.verificationLocation!)}
+                        >
+                          <Text style={styles.locationLabel}>Recipient's Location:</Text>
+                          <View style={styles.locationInfo}>
+                            <MapPin size={16} color="#3B82F6" />
+                            <Text style={styles.locationText}>
+                              {request.verificationLocation.latitude.toFixed(4)}, {request.verificationLocation.longitude.toFixed(4)}
+                            </Text>
+                            <ArrowRight size={16} color="#3B82F6" />
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  <View style={styles.actions}>
+                    {request.type === 'received' && request.status === 'pending' ? (
+                      <TouchableOpacity
+                        style={styles.verifyButton}
+                        onPress={() => handleTransferRequestPress(request)}
+                      >
+                        <Text style={styles.verifyButtonText}>Verify & Approve</Text>
+                      </TouchableOpacity>
+                    ) : request.type === 'sent' && request.status === 'verified' ? (
+                      <TouchableOpacity
+                        style={[styles.approveButton, loading && styles.buttonDisabled]}
+                        onPress={() => handleApproveTransfer(request)}
+                        disabled={loading}
+                      >
+                        <CheckCircle size={20} color="#FFFFFF" />
+                        <Text style={styles.approveButtonText}>
+                          {loading ? 'Processing...' : 'Approve Transfer'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.pendingStatus}>
+                        <Clock size={16} color="#F59E0B" />
+                        <Text style={styles.pendingText}>
+                          {request.status === 'pending' ? 'Waiting for recipient verification...' : 'Waiting for approval...'}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={() => handleCancelTransfer(request)}
+                    >
+                      <XCircle size={20} color="#EF4444" />
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               ))}
             </View>
           </View>
@@ -343,45 +597,210 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
   },
-  requestItem: {
+  requestCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  recipientInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    flex: 1,
   },
-  requestIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FEF3C7',
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  requestDetails: {
-    flex: 1,
-  },
-  requestName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
-  },
-  requestStatus: {
-    fontSize: 12,
-    color: '#F59E0B',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  requestDate: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  requestAmount: {
+  recipientName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  recipientPhone: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
+  amount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  status: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  transferDetails: {
+    marginBottom: 16,
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  verificationSection: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  verificationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  verificationItems: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  verificationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  verificationIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  verificationText: {
+    fontSize: 14,
+    color: '#166534',
+    fontWeight: '500',
+  },
+  selfieContainer: {
+    marginBottom: 12,
+  },
+  selfieLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  selfieImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  locationContainer: {
+    marginBottom: 8,
+  },
+  locationLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    padding: 12,
+    borderRadius: 8,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#1E40AF',
+    fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  verifyButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 12,
+    alignItems: 'center',
+  },
+  verifyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  approveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 12,
+  },
+  approveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  buttonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  pendingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 12,
+  },
+  pendingText: {
+    color: '#92400E',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   transactionItem: {
     flexDirection: 'row',
