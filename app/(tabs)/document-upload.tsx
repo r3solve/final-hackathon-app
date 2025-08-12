@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,41 +25,73 @@ export default function DocumentUpload() {
   const [uploadingFront, setUploadingFront] = useState(false);
   const [uploadingBack, setUploadingBack] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 DocumentUpload mounted');
+    console.log('📱 Profile:', profile?.id);
+    console.log('📸 ImagePicker available:', !!ImagePicker);
+    console.log('📸 ImagePicker.MediaType:', ImagePicker.MediaType);
+  }, [profile]);
+
   const requestPermissions = async () => {
-    const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (mediaStatus !== 'granted') {
-      Alert.alert('Permission Required', 'Media library permission is required to upload your Ghana ID card.');
+    try {
+      console.log('🔐 Requesting media library permissions...');
+      const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('📱 Media library permission status:', mediaStatus);
+      
+      if (mediaStatus !== 'granted') {
+        Alert.alert('Permission Required', 'Media library permission is required to upload your Ghana ID card.');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('❌ Permission request error:', error);
+      Alert.alert('Error', 'Failed to request permissions. Please try again.');
       return false;
     }
-    return true;
   };
 
   const pickImage = async (type: 'front' | 'back') => {
+    console.log(`📸 Picking ${type} image...`);
     const hasPermission = await requestPermissions();
     if (!hasPermission) return;
 
     try {
+      console.log('📸 Launching image picker...');
+      
+      // Use fallback if MediaType is not available
+      const mediaTypes = ImagePicker.MediaType?.Images || 'Images';
+      console.log('📸 Using media types:', mediaTypes);
+      
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: mediaTypes,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.9,
       });
 
+      console.log('📸 Image picker result:', result);
+
       if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        console.log(`✅ ${type} image selected:`, imageUri);
+        
         if (type === 'front') {
-          setGhanaCardFront(result.assets[0].uri);
+          setGhanaCardFront(imageUri);
         } else {
-          setGhanaCardBack(result.assets[0].uri);
+          setGhanaCardBack(imageUri);
         }
+      } else {
+        console.log('❌ Image selection cancelled or failed');
       }
     } catch (error) {
+      console.error('❌ Image picker error:', error);
       Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
   const removeImage = (type: 'front' | 'back') => {
+    console.log(`🗑️ Removing ${type} image`);
     if (type === 'front') {
       setGhanaCardFront(null);
     } else {
@@ -68,14 +100,34 @@ export default function DocumentUpload() {
   };
 
   const uploadImage = async (uri: string, path: string): Promise<string> => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, blob);
-    return getDownloadURL(storageRef);
+    try {
+      console.log('📤 Uploading image:', { uri, path });
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const blob = await response.blob();
+      console.log('📦 Blob created, size:', blob.size);
+      
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, blob);
+      console.log('✅ Image uploaded to storage');
+      
+      const downloadUrl = await getDownloadURL(storageRef);
+      console.log('🔗 Download URL obtained:', downloadUrl);
+      return downloadUrl;
+    } catch (error) {
+      console.error('❌ Image upload error:', error);
+      throw new Error('Failed to upload image');
+    }
   };
 
   const handleContinue = async () => {
+    console.log('🚀 Continue button pressed');
+    console.log('📝 Ghana card number:', ghanaCardNumber);
+    console.log('📸 Front image:', !!ghanaCardFront);
+    console.log('📸 Back image:', !!ghanaCardBack);
+
     if (!ghanaCardNumber.trim()) {
       Alert.alert('Missing Information', 'Please enter your Ghana Card number.');
       return;
@@ -91,19 +143,24 @@ export default function DocumentUpload() {
       const userId = profile?.id;
       if (!userId) throw new Error('User not found');
 
+      console.log('👤 User ID:', userId);
+
       // Upload images to Firebase Storage
       setUploadingFront(true);
       setUploadingBack(true);
 
+      console.log('📤 Starting image uploads...');
       const [ghanaCardFrontUrl, ghanaCardBackUrl] = await Promise.all([
         uploadImage(ghanaCardFront, `verification/${userId}/ghana-card-front.jpg`),
         uploadImage(ghanaCardBack, `verification/${userId}/ghana-card-back.jpg`)
       ]);
 
+      console.log('✅ Both images uploaded successfully');
       setUploadingFront(false);
       setUploadingBack(false);
 
       // Update profile with verification documents
+      console.log('📝 Updating profile...');
       await updateProfile({
         ghanaCardNumber: ghanaCardNumber.trim(),
         ghanaCardFrontUrl,
@@ -112,13 +169,16 @@ export default function DocumentUpload() {
         verificationSubmittedAt: new Date(),
       });
 
+      console.log('✅ Profile updated successfully');
+
       // Navigate to selfie capture screen
+      console.log('🔄 Navigating to selfie capture...');
       router.push('/(tabs)/selfie-capture');
     } catch (error) {
       setUploadingFront(false);
       setUploadingBack(false);
+      console.error('❌ Document upload error:', error);
       Alert.alert('Error', 'Failed to upload documents. Please try again.');
-      console.error('Document upload error:', error);
     } finally {
       setLoading(false);
     }
