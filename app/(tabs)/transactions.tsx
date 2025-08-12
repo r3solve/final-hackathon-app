@@ -25,7 +25,8 @@ import {
   MapPin, 
   Camera, 
   XCircle, 
-  ArrowRight 
+  ArrowRight,
+  Shield
 } from 'lucide-react-native';
 
 interface TransferRequest {
@@ -58,11 +59,42 @@ interface Transaction {
 }
 
 export default function Transactions() {
-  const { user } = useAuth();
+  const { user, canPerformTransactions } = useAuth();
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Check if user can perform transactions
+  if (!canPerformTransactions()) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Activity</Text>
+            <Text style={styles.subtitle}>View your transaction history</Text>
+          </View>
+
+          <View style={styles.verificationRequiredCard}>
+            <View style={styles.verificationRequiredIcon}>
+              <Shield size={48} color="#F59E0B" />
+            </View>
+            <Text style={styles.verificationRequiredTitle}>Verification Required</Text>
+            <Text style={styles.verificationRequiredMessage}>
+              You need to complete your identity verification before you can view your transaction history. This helps us ensure the security of all transactions.
+            </Text>
+            <TouchableOpacity
+              style={styles.verificationRequiredButton}
+              onPress={() => router.push('/(tabs)/document-upload')}
+            >
+              <Shield size={20} color="#FFFFFF" />
+              <Text style={styles.verificationRequiredButtonText}>Complete Verification</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   const fetchData = async () => {
     if (!user) return;
@@ -231,24 +263,42 @@ export default function Transactions() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-GH', {
+      year: 'numeric',
       month: 'short',
       day: 'numeric',
-      hour: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
     });
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'completed':
+        return '#22C55E';
       case 'pending':
         return '#F59E0B';
       case 'verified':
         return '#3B82F6';
-      case 'completed':
-        return '#22C55E';
+      case 'cancelled':
+        return '#EF4444';
       default:
         return '#6B7280';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'Completed';
+      case 'pending':
+        return 'Pending';
+      case 'verified':
+        return 'Verified';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Unknown';
     }
   };
 
@@ -582,6 +632,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 4,
+  },
   section: {
     paddingHorizontal: 24,
     marginBottom: 32,
@@ -862,5 +917,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  verificationRequiredCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 24,
+    marginTop: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  verificationRequiredIcon: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 24,
+    padding: 12,
+    marginBottom: 16,
+  },
+  verificationRequiredTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 8,
+  },
+  verificationRequiredMessage: {
+    fontSize: 14,
+    color: '#92400E',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  verificationRequiredButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D97706',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  verificationRequiredButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

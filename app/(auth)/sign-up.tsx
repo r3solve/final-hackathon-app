@@ -19,10 +19,41 @@ export default function SignUp() {
     if (!email.trim()) return 'Email is required';
     if (!/\S+@\S+\.\S+/.test(email)) return 'Email format is invalid';
     if (!phoneNumber.trim()) return 'Phone number is required';
-    if (!/^\+?[\d\s-()]+$/.test(phoneNumber)) return 'Phone number format is invalid';
+    
+    // Validate Ghana phone number format
+    const phoneRegex = /^\+233[0-9]{9}$/;
+    if (!phoneRegex.test(phoneNumber.trim())) {
+      return 'Please enter a valid Ghana phone number (e.g., +233501234567)';
+    }
+    
     if (!password) return 'Password is required';
     if (password.length < 6) return 'Password must be at least 6 characters';
     return null;
+  };
+
+  const formatPhoneNumber = (text: string) => {
+    // Remove all non-digit characters except +
+    let cleaned = text.replace(/[^\d+]/g, '');
+    
+    // Ensure it starts with +233
+    if (!cleaned.startsWith('+233')) {
+      if (cleaned.startsWith('233')) {
+        cleaned = '+' + cleaned;
+      } else if (cleaned.startsWith('0')) {
+        cleaned = '+233' + cleaned.substring(1);
+      } else if (cleaned.startsWith('+')) {
+        // Keep as is
+      } else {
+        cleaned = '+233' + cleaned;
+      }
+    }
+    
+    // Limit to +233 + 9 digits
+    if (cleaned.length > 13) {
+      cleaned = cleaned.substring(0, 13);
+    }
+    
+    return cleaned;
   };
 
   const handleSignUp = async () => {
@@ -107,10 +138,14 @@ export default function SignUp() {
           <TextInput
             style={styles.input}
             value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            placeholder="+233 XX XXX XXXX"
+            onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
+            placeholder="+233501234567"
             keyboardType="phone-pad"
+            maxLength={13}
           />
+          <Text style={styles.helperText}>
+            Enter Ghana phone number starting with +233
+          </Text>
         </View>
 
         <View style={styles.inputGroup}>
@@ -243,5 +278,11 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

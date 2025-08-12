@@ -30,6 +30,10 @@ interface AuthContextType {
   updateProfile: (updates: Partial<Profile>) => Promise<{ error?: string }>;
   resendVerificationEmail: () => Promise<{ error?: string; success?: boolean }>;
   checkEmailVerification: () => Promise<boolean>;
+  canPerformTransactions: () => boolean;
+  canReceiveMoney: () => boolean;
+  canSendMoney: () => boolean;
+  canDeposit: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -267,6 +271,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Verification check functions
+  const canPerformTransactions = () => {
+    return !!(profile && profile.isVerified && profile.emailVerified);
+  };
+
+  const canReceiveMoney = () => {
+    return !!(profile && profile.isVerified && profile.emailVerified);
+  };
+
+  const canSendMoney = () => {
+    return !!(profile && profile.isVerified && profile.emailVerified);
+  };
+
+  const canDeposit = () => {
+    return !!(profile && profile.isVerified && profile.emailVerified);
+  };
+
   const value = {
     user,
     profile,
@@ -277,6 +298,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateProfile,
     resendVerificationEmail,
     checkEmailVerification,
+    canPerformTransactions,
+    canReceiveMoney,
+    canSendMoney,
+    canDeposit,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

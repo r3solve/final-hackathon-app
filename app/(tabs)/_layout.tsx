@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Send, Clock, User, Shield, Wallet, Grid2x2 } from 'lucide-react-native';
+import { Chrome as Home, Send, Clock, User, Shield, Wallet, Grid2x2, Activity } from 'lucide-react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   return (
@@ -10,23 +11,33 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 80,
+          borderTopWidth: 0,
+          paddingBottom: 12,
+          paddingTop: 12,
+          height: 90,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          elevation: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Grid2x2 size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Grid2x2 size={size} color={color} />
+            </View>
           ),
         }}
       />
@@ -34,8 +45,10 @@ export default function TabLayout() {
         name="send"
         options={{
           title: 'Send',
-          tabBarIcon: ({ color, size }) => (
-            <Send size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Send size={size} color={color} />
+            </View>
           ),
         }}
       />
@@ -43,8 +56,10 @@ export default function TabLayout() {
         name="transactions"
         options={{
           title: 'Activity',
-          tabBarIcon: ({ color, size }) => (
-            <Clock size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Activity size={size} color={color} />
+            </View>
           ),
         }}
       />
@@ -52,9 +67,17 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <User size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <User size={size} color={color} />
+            </View>
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -78,3 +101,19 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    transition: 'all 0.2s ease',
+  },
+  tabIconActive: {
+    backgroundColor: '#F0FDF4',
+    transform: [{ scale: 1.1 }],
+  },
+});

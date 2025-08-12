@@ -17,7 +17,7 @@ import {
 } from 'lucide-react-native';
 
 export default function Profile() {
-  const { profile, user, signOut } = useAuth();
+  const { profile, user, signOut, canPerformTransactions } = useAuth();
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -44,6 +44,19 @@ export default function Profile() {
     }).format(amount);
   };
 
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return 'N/A';
+    // Ensure it's in Ghana format
+    if (phone.startsWith('+233')) {
+      return phone;
+    } else if (phone.startsWith('233')) {
+      return '+' + phone;
+    } else if (phone.startsWith('0')) {
+      return '+233' + phone.substring(1);
+    }
+    return phone;
+  };
+
   const getVerificationStatus = () => {
     if (!profile) return { status: 'unknown', text: 'Unknown', color: '#6B7280', icon: Shield };
     
@@ -63,9 +76,10 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
+          <Text style={styles.subtitle}>Manage your account and verification</Text>
         </View>
 
         <View style={styles.profileCard}>
@@ -74,11 +88,21 @@ export default function Profile() {
           </View>
           <Text style={styles.name}>{profile?.fullName}</Text>
           <Text style={styles.joinDate}>
-            Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', {
+            Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-GH', {
               month: 'long',
               year: 'numeric'
             }) : 'N/A'}
           </Text>
+          <View style={styles.profileStats}>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{profile?.verificationStatus === 'verified' ? 'Verified' : 'Unverified'}</Text>
+              <Text style={styles.profileStatLabel}>Status</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{profile?.phoneNumber ? 'Active' : 'Inactive'}</Text>
+              <Text style={styles.profileStatLabel}>Phone</Text>
+            </View>
+          </View>
         </View>
 
         {/* Verification Status Card */}
@@ -140,7 +164,7 @@ export default function Profile() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Phone Number</Text>
-              <Text style={styles.infoValue}>{profile?.phoneNumber}</Text>
+              <Text style={styles.infoValue}>{formatPhoneNumber(profile?.phoneNumber)}</Text>
             </View>
           </View>
 
@@ -207,6 +231,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 4,
+  },
   profileCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
@@ -238,6 +267,25 @@ const styles = StyleSheet.create({
   joinDate: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  profileStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 16,
+  },
+  profileStat: {
+    alignItems: 'center',
+  },
+  profileStatValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  profileStatLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
   verificationCard: {
     backgroundColor: '#FFFFFF',

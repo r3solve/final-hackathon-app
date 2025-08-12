@@ -13,7 +13,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Eye, EyeOff, ArrowUpRight, ArrowDownLeft, Send, Activity, Plus, AlertCircle } from 'lucide-react-native';
+import { Eye, EyeOff, ArrowUpRight, ArrowDownLeft, Send, Activity, Plus, AlertCircle, Shield, TrendingUp, Bell } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 interface Transaction {
@@ -26,7 +26,7 @@ interface Transaction {
 }
 
 export default function Wallet() {
-  const { profile, user } = useAuth();
+  const { profile, user, canPerformTransactions, canSendMoney, canReceiveMoney, canDeposit } = useAuth();
   const [showBalance, setShowBalance] = useState(true);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -137,28 +137,52 @@ export default function Wallet() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-GH', {
       month: 'short',
       day: 'numeric',
     });
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         <View style={styles.header}>
-          <Text style={styles.greeting}>Welcome back,</Text>
-          <Text style={styles.name}>{profile?.fullName}</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>{getGreeting()},</Text>
+            <Text style={styles.name}>{profile?.fullName}</Text>
+            <Text style={styles.welcomeText}>Welcome to PayFlow Ghana</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => router.push('/(tabs)/notifications')}
+          >
+            <Bell size={24} color="#374151" />
+            {/* Add notification badge here if needed */}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>Wallet Balance</Text>
-            <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
+            <View style={styles.balanceInfo}>
+              <Text style={styles.balanceLabel}>Wallet Balance</Text>
+              <Text style={styles.currencyLabel}>Ghana Cedi (GHS)</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.eyeButton}
+              onPress={() => setShowBalance(!showBalance)}
+            >
               {showBalance ? (
                 <Eye size={20} color="#6B7280" />
               ) : (
@@ -169,60 +193,114 @@ export default function Wallet() {
           <Text style={styles.balance}>
             {showBalance ? formatCurrency(profile?.walletBalance || 0) : '••••••'}
           </Text>
+          <View style={styles.balanceFooter}>
+            <View style={styles.balanceStat}>
+              <TrendingUp size={16} color="#22C55E" />
+              <Text style={styles.balanceStatText}>Active Account</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.quickActions}>
           <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/send')}
+            style={[styles.actionCard, !canSendMoney() && styles.actionCardDisabled]}
+            onPress={() => canSendMoney() ? router.push('/(tabs)/send') : null}
+            disabled={!canSendMoney()}
           >
             <View style={[styles.actionIcon, { backgroundColor: '#EFF6FF' }]}>
-              <Send size={24} color="#3B82F6" />
+              <Send size={24} color={canSendMoney() ? "#3B82F6" : "#9CA3AF"} />
             </View>
-            <Text style={styles.actionTitle}>Send</Text>
-            <Text style={styles.actionSubtitle}>Send money</Text>
+            <Text style={[styles.actionTitle, !canSendMoney() && styles.actionTitleDisabled]}>
+              {canSendMoney() ? 'Send Money' : 'Send Money'}
+            </Text>
+            <Text style={[styles.actionSubtitle, !canSendMoney() && styles.actionSubtitleDisabled]}>
+              {canSendMoney() ? 'Transfer to friends' : 'Verification required'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/transactions')}
+            style={[styles.actionCard, !canPerformTransactions() && styles.actionCardDisabled]}
+            onPress={() => canPerformTransactions() ? router.push('/(tabs)/transactions') : null}
+            disabled={!canPerformTransactions()}
           >
             <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}>
-              <Activity size={24} color="#22C55E" />
-              {pendingTransfersCount > 0 && (
+              <Activity size={24} color={canPerformTransactions() ? "#22C55E" : "#9CA3AF"} />
+              {pendingTransfersCount > 0 && canPerformTransactions() && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{pendingTransfersCount}</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.actionTitle}>Activity</Text>
-            <Text style={styles.actionSubtitle}>View history</Text>
+            <Text style={[styles.actionTitle, !canPerformTransactions() && styles.actionTitleDisabled]}>
+              {canPerformTransactions() ? 'Activity' : 'Activity'}
+            </Text>
+            <Text style={[styles.actionSubtitle, !canPerformTransactions() && styles.actionSubtitleDisabled]}>
+              {canPerformTransactions() ? 'View history' : 'Verification required'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => router.push('/deposit')}
+            style={[styles.actionCard, !canDeposit() && styles.actionCardDisabled]}
+            onPress={() => canDeposit() ? router.push('/deposit') : null}
+            disabled={!canDeposit()}
           >
             <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Plus size={24} color="#F59E0B" />
+              <Plus size={24} color={canDeposit() ? "#F59E0B" : "#9CA3AF"} />
             </View>
-            <Text style={styles.actionTitle}>Deposit</Text>
-            <Text style={styles.actionSubtitle}>Add money</Text>
+            <Text style={[styles.actionTitle, !canDeposit() && styles.actionTitleDisabled]}>
+              {canDeposit() ? 'Deposit' : 'Deposit'}
+            </Text>
+            <Text style={[styles.actionSubtitle, !canDeposit() && styles.actionSubtitleDisabled]}>
+              {canDeposit() ? 'Add money' : 'Verification required'}
+            </Text>
           </TouchableOpacity>
         </View>
 
+        {profile?.verificationStatus === 'pending' && (
+          <View style={styles.verificationBanner}>
+            <View style={styles.verificationBannerContent}>
+              <Shield size={20} color="#F59E0B" />
+              <View style={styles.verificationBannerText}>
+                <Text style={styles.verificationBannerTitle}>Complete Verification</Text>
+                <Text style={styles.verificationBannerSubtitle}>
+                  Verify your identity to unlock all features
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.verificationBannerButton}
+                onPress={() => router.push('/(tabs)/document-upload')}
+              >
+                <Text style={styles.verificationBannerButtonText}>Verify Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/transactions')}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          
           {recentTransactions.length === 0 ? (
             <View style={styles.emptyState}>
+              <Activity size={48} color="#D1D5DB" />
               <Text style={styles.emptyText}>No transactions yet</Text>
               <Text style={styles.emptySubtext}>Start sending money to see your activity here</Text>
             </View>
           ) : (
             <View style={styles.transactionsList}>
-              {recentTransactions.map((transaction) => (
-                <View key={transaction.id} style={styles.transactionItem}>
-                  <View style={styles.transactionIcon}>
+              {recentTransactions.map((transaction, index) => (
+                <View key={transaction.id} style={[
+                  styles.transactionItem,
+                  index === recentTransactions.length - 1 && styles.transactionItemLast
+                ]}>
+                  <View style={[
+                    styles.transactionIcon,
+                    { backgroundColor: transaction.type === 'sent' ? '#FEF2F2' : '#F0FDF4' }
+                  ]}>
                     {transaction.type === 'sent' ? (
                       <ArrowUpRight size={16} color="#EF4444" />
                     ) : (
@@ -265,9 +343,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 24,
+  },
+  headerLeft: {
+    flex: 1,
   },
   greeting: {
     fontSize: 16,
@@ -278,6 +362,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
     marginTop: 4,
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  notificationButton: {
+    padding: 8,
   },
   balanceCard: {
     backgroundColor: '#FFFFFF',
@@ -297,15 +389,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  balanceInfo: {
+    flex: 1,
+  },
   balanceLabel: {
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
   },
+  currencyLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  eyeButton: {
+    padding: 8,
+  },
   balance: {
     fontSize: 36,
     fontWeight: '800',
     color: '#1F2937',
+  },
+  balanceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  balanceStat: {
+    alignItems: 'center',
+  },
+  balanceStatText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
   quickActions: {
     flexDirection: 'row',
@@ -325,6 +444,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '33%', // Three cards in a row
   },
+  actionCardDisabled: {
+    opacity: 0.7,
+  },
   actionIcon: {
     width: 56,
     height: 56,
@@ -340,10 +462,16 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     textAlign: 'center',
   },
+  actionTitleDisabled: {
+    color: '#9CA3AF',
+  },
   actionSubtitle: {
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  actionSubtitleDisabled: {
+    color: '#9CA3AF',
   },
   badge: {
     position: 'absolute',
@@ -362,20 +490,73 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  verificationBanner: {
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 24,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
+  verificationBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  verificationBannerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  verificationBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  verificationBannerSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  verificationBannerButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  verificationBannerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   section: {
     paddingHorizontal: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 16,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '600',
   },
   emptyState: {
     backgroundColor: '#FFFFFF',
     padding: 32,
     borderRadius: 16,
     alignItems: 'center',
+    marginBottom: 24,
   },
   emptyText: {
     fontSize: 16,
@@ -399,6 +580,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+  },
+  transactionItemLast: {
+    borderBottomWidth: 0,
   },
   transactionIcon: {
     width: 32,
