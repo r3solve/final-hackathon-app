@@ -10,7 +10,7 @@ import {
   addDoc 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { DollarSign, Phone, Shield, Info, CheckCircle } from 'lucide-react-native';
+import { DollarSign, Phone, Shield, Info, CheckCircle, CreditCard, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function Send() {
@@ -207,6 +207,13 @@ export default function Send() {
           <Text style={styles.balance}>
             {formatCurrency(profile?.walletBalance || 0)}
           </Text>
+          <TouchableOpacity
+            style={styles.depositButton}
+            onPress={() => router.push('/(tabs)/deposit')}
+          >
+            <Plus size={16} color="#FFFFFF" />
+            <Text style={styles.depositButtonText}>Deposit Money</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.form}>
@@ -218,7 +225,7 @@ export default function Send() {
                 style={styles.input}
                 value={phoneNumber}
                 onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
-                placeholder="+233501234567"
+                placeholder="e.g., +233501234567"
                 keyboardType="phone-pad"
                 maxLength={13}
               />
@@ -236,7 +243,7 @@ export default function Send() {
                 style={styles.input}
                 value={amount}
                 onChangeText={setAmount}
-                placeholder="0.00"
+                placeholder="e.g., 0.00"
                 keyboardType="decimal-pad"
               />
             </View>
@@ -385,6 +392,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#22C55E',
     marginTop: 4,
+  },
+  depositButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22C55E',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  depositButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   form: {
     paddingHorizontal: 24,
@@ -541,5 +564,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  paymentMethodsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  paymentMethodsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
 });

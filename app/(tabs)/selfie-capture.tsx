@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, CameraType } from 'expo-camera';
 import { useAuth } from '@/contexts/AuthContext';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
 import { 
   Camera as CameraIcon, 
   CheckCircle, 
   ArrowLeft,
   RotateCcw,
-  Upload
+  Plus
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -22,6 +22,18 @@ const FALLBACK_CAMERA_TYPES = {
   back: 1,
 } as const;
 
+// Dynamic import for expo-camera to avoid import issues
+let Camera: any = null;
+let CameraType: any = null;
+
+try {
+  const expoCamera = require('expo-camera');
+  Camera = expoCamera.Camera;
+  CameraType = expoCamera.CameraType;
+} catch (error) {
+  console.warn('⚠️ Failed to import expo-camera:', error);
+}
+
 export default function SelfieCapture() {
   const { profile, updateProfile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -29,16 +41,14 @@ export default function SelfieCapture() {
   const [showCamera, setShowCamera] = useState(true);
   const [cameraType, setCameraType] = useState<number>(FALLBACK_CAMERA_TYPES.front);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<any>(null);
 
   // Initialize camera type safely
   useEffect(() => {
     try {
       if (CameraType && typeof CameraType.front === 'number') {
         setCameraType(CameraType.front);
-        console.log('✅ CameraType enum available:', { front: CameraType.front, back: CameraType.back });
       } else {
-        console.warn('⚠️ CameraType enum not available, using fallback values');
         setCameraType(FALLBACK_CAMERA_TYPES.front);
       }
     } catch (error) {
@@ -50,9 +60,12 @@ export default function SelfieCapture() {
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(status === 'granted');
-        console.log('📱 Camera permission status:', status);
+        if (Camera && Camera.requestCameraPermissionsAsync) {
+          const { status } = await Camera.requestCameraPermissionsAsync();
+          setHasPermission(status === 'granted');
+        } else {
+          setHasPermission(false);
+        }
       } catch (error) {
         console.error('❌ Camera permission error:', error);
         setHasPermission(false);
@@ -63,22 +76,17 @@ export default function SelfieCapture() {
   const takeSelfie = async () => {
     if (cameraRef.current) {
       try {
-        console.log('📸 Taking selfie with camera type:', cameraType);
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.9,
           base64: false,
           skipProcessing: false,
         });
-        console.log('✅ Selfie captured successfully:', photo.uri);
         setSelfie(photo.uri);
         setShowCamera(false);
       } catch (error) {
         console.error('❌ Selfie capture error:', error);
         Alert.alert('Error', 'Failed to take photo. Please try again.');
       }
-    } else {
-      console.error('❌ Camera ref not available');
-      Alert.alert('Error', 'Camera not ready. Please try again.');
     }
   };
 
@@ -87,9 +95,27 @@ export default function SelfieCapture() {
     setShowCamera(true);
   };
 
+  const pickImageFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.9,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelfie(result.assets[0].uri);
+        setShowCamera(false);
+      }
+    } catch (error) {
+      console.error('❌ Image picker error:', error);
+      Alert.alert('Error', 'Failed to pick image from gallery. Please try again.');
+    }
+  };
+
   const uploadSelfie = async (uri: string): Promise<string> => {
     try {
-      console.log('📤 Uploading selfie:', uri);
       const response = await fetch(uri);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -98,7 +124,6 @@ export default function SelfieCapture() {
       const storageRef = ref(storage, `verification/${profile?.id}/selfie.jpg`);
       await uploadBytes(storageRef, blob);
       const downloadUrl = await getDownloadURL(storageRef);
-      console.log('✅ Selfie uploaded successfully:', downloadUrl);
       return downloadUrl;
     } catch (error) {
       console.error('❌ Selfie upload error:', error);
@@ -117,10 +142,8 @@ export default function SelfieCapture() {
       const userId = profile?.id;
       if (!userId) throw new Error('User not found');
 
-      // Upload selfie to Firebase Storage
       const selfieUrl = await uploadSelfie(selfie);
 
-      // Update profile with selfie
       await updateProfile({
         selfieUrl,
         verificationStatus: 'submitted',
@@ -145,25 +168,19 @@ export default function SelfieCapture() {
     }
   };
 
-  // Safe camera type switching
   const switchCamera = () => {
     try {
       let newCameraType: number;
       
       if (CameraType && typeof CameraType.front === 'number' && typeof CameraType.back === 'number') {
-        // Use enum values
         newCameraType = cameraType === CameraType.front ? CameraType.back : CameraType.front;
-        console.log('🔄 Switching camera using enum:', { from: cameraType, to: newCameraType });
       } else {
-        // Use fallback values
         newCameraType = cameraType === FALLBACK_CAMERA_TYPES.front ? FALLBACK_CAMERA_TYPES.back : FALLBACK_CAMERA_TYPES.front;
-        console.log('🔄 Switching camera using fallback:', { from: cameraType, to: newCameraType });
       }
       
       setCameraType(newCameraType);
     } catch (error) {
       console.error('❌ Camera switch error:', error);
-      // Fallback toggle
       const newCameraType = cameraType === FALLBACK_CAMERA_TYPES.front ? FALLBACK_CAMERA_TYPES.back : FALLBACK_CAMERA_TYPES.front;
       setCameraType(newCameraType);
     }
@@ -199,74 +216,74 @@ export default function SelfieCapture() {
     );
   }
 
-  if (showCamera) {
+  if (showCamera && Camera) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.cameraContainer}>
-          {Camera ? (
-            <Camera
-              ref={cameraRef}
-              style={styles.camera}
-              type={cameraType}
-              ratio="4:3"
-            >
-              <View style={styles.cameraOverlay}>
-                {/* Header */}
-                <View style={styles.cameraHeader}>
-                  <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                  >
-                    <ArrowLeft size={24} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <Text style={styles.cameraTitle}>Take Selfie</Text>
-                  <TouchableOpacity
-                    style={styles.switchButton}
-                    onPress={switchCamera}
-                  >
-                    <RotateCcw size={24} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Camera Guidelines */}
-                <View style={styles.guidelinesContainer}>
-                  <View style={styles.guidelineFrame}>
-                    <View style={styles.guidelineCorner} />
-                    <View style={[styles.guidelineCorner, styles.guidelineCornerTopRight]} />
-                    <View style={[styles.guidelineCorner, styles.guidelineCornerBottomLeft]} />
-                    <View style={[styles.guidelineCorner, styles.guidelineCornerBottomRight]} />
-                  </View>
-                  <Text style={styles.guidelineText}>
-                    Position your face within the frame
-                  </Text>
-                </View>
-
-                {/* Camera Controls */}
-                <View style={styles.cameraControls}>
-                  <TouchableOpacity
-                    style={styles.captureButton}
-                    onPress={takeSelfie}
-                  >
-                    <View style={styles.captureButtonInner} />
-                  </TouchableOpacity>
-                </View>
+          <Camera
+            ref={cameraRef}
+            style={styles.camera}
+            type={cameraType}
+            ratio="4:3"
+          >
+            <View style={styles.cameraOverlay}>
+              <View style={styles.cameraHeader}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => router.back()}
+                >
+                  <ArrowLeft size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+                <Text style={styles.cameraTitle}>Take Selfie</Text>
+                <TouchableOpacity
+                  style={styles.switchButton}
+                  onPress={switchCamera}
+                >
+                  <RotateCcw size={24} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-            </Camera>
-          ) : (
-            <View style={styles.cameraErrorContainer}>
-              <CameraIcon size={64} color="#EF4444" />
-              <Text style={styles.cameraErrorTitle}>Camera Not Available</Text>
-              <Text style={styles.cameraErrorText}>
-                The camera component is not available. Please check your expo-camera installation.
-              </Text>
-              <TouchableOpacity
-                style={styles.cameraErrorButton}
-                onPress={() => router.back()}
-              >
-                <Text style={styles.cameraErrorButtonText}>Go Back</Text>
-              </TouchableOpacity>
+
+              <View style={styles.cameraControls}>
+                <TouchableOpacity
+                  style={styles.captureButton}
+                  onPress={takeSelfie}
+                >
+                  <View style={styles.captureButtonInner} />
+                </TouchableOpacity>
+              </View>
             </View>
-          )}
+          </Camera>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (showCamera && !Camera) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.cameraErrorContainer}>
+          <CameraIcon size={64} color="#EF4444" />
+          <Text style={styles.cameraErrorTitle}>Camera Not Available</Text>
+          <Text style={styles.cameraErrorText}>
+            The camera component is not available. Please try selecting from gallery instead.
+          </Text>
+          
+          <View style={styles.fallbackOptions}>
+            <TouchableOpacity
+              style={styles.fallbackButton}
+              onPress={pickImageFromGallery}
+            >
+              <Plus size={20} color="#FFFFFF" />
+              <Text style={styles.fallbackButtonText}>Select from Gallery</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.cameraErrorButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.cameraErrorButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -275,7 +292,6 @@ export default function SelfieCapture() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.previewContainer}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton} 
@@ -287,24 +303,6 @@ export default function SelfieCapture() {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Progress Indicator */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressStep}>
-            <View style={styles.progressDot}>
-              <CheckCircle size={16} color="#22C55E" />
-            </View>
-            <Text style={styles.progressText}>Documents</Text>
-          </View>
-          <View style={styles.progressLine} />
-          <View style={styles.progressStep}>
-            <View style={[styles.progressDot, styles.progressDotActive]}>
-              <CheckCircle size={16} color="#FFFFFF" />
-            </View>
-            <Text style={styles.progressText}>Selfie</Text>
-          </View>
-        </View>
-
-        {/* Selfie Preview */}
         <View style={styles.previewSection}>
           <Text style={styles.previewTitle}>Your Selfie</Text>
           <Text style={styles.previewSubtitle}>
@@ -312,7 +310,9 @@ export default function SelfieCapture() {
           </Text>
           
           <View style={styles.selfiePreview}>
-            <Image source={{ uri: selfie }} style={styles.selfieImage} />
+            {selfie && (
+              <Image source={{ uri: selfie }} style={styles.selfieImage} />
+            )}
             <View style={styles.selfieOverlay}>
               <TouchableOpacity
                 style={styles.retakeButton}
@@ -325,24 +325,6 @@ export default function SelfieCapture() {
           </View>
         </View>
 
-        {/* Requirements */}
-        <View style={styles.requirementsContainer}>
-          <Text style={styles.requirementsTitle}>Selfie Requirements:</Text>
-          <View style={styles.requirementItem}>
-            <CheckCircle size={16} color="#22C55E" />
-            <Text style={styles.requirementText}>Face must be clearly visible</Text>
-          </View>
-          <View style={styles.requirementItem}>
-            <CheckCircle size={16} color="#22C55E" />
-            <Text style={styles.requirementText}>Good lighting conditions</Text>
-          </View>
-          <View style={styles.requirementItem}>
-            <CheckCircle size={16} color="#22C55E" />
-            <Text style={styles.requirementText}>No sunglasses or face coverings</Text>
-          </View>
-        </View>
-
-        {/* Submit Button */}
         <TouchableOpacity
           style={[styles.submitButton, loading && styles.submitButtonDisabled]}
           onPress={handleSubmit}
@@ -400,61 +382,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-  guidelinesContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  guidelineFrame: {
-    width: screenWidth * 0.7,
-    height: screenWidth * 0.7,
-    position: 'relative',
-    marginBottom: 20,
-  },
-  guidelineCorner: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: '#FFFFFF',
-    top: 0,
-    left: 0,
-  },
-  guidelineCornerTopRight: {
-    top: 0,
-    right: 0,
-    left: 'auto',
-    borderLeftWidth: 0,
-    borderRightWidth: 3,
-  },
-  guidelineCornerBottomLeft: {
-    top: 'auto',
-    bottom: 0,
-    borderTopWidth: 0,
-    borderBottomWidth: 3,
-  },
-  guidelineCornerBottomRight: {
-    top: 'auto',
-    bottom: 0,
-    right: 0,
-    left: 'auto',
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 3,
-    borderBottomWidth: 3,
-  },
-  guidelineText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
   },
   cameraControls: {
     alignItems: 'center',
@@ -531,40 +458,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
   },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 24,
-  },
-  progressStep: {
-    alignItems: 'center',
-  },
-  progressDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  progressDotActive: {
-    backgroundColor: '#22C55E',
-  },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  progressLine: {
-    width: 60,
-    height: 2,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 16,
-  },
   previewSection: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
@@ -625,31 +518,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  requirementsContainer: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    marginBottom: 24,
-    padding: 20,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#22C55E',
-  },
-  requirementsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
-  },
-  requirementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 12,
-  },
-  requirementText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
   submitButton: {
     backgroundColor: '#22C55E',
     paddingVertical: 18,
@@ -702,6 +570,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   cameraErrorButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  fallbackOptions: {
+    gap: 16,
+    width: '100%',
+  },
+  fallbackButton: {
+    backgroundColor: '#22C55E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    gap: 8,
+  },
+  fallbackButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',

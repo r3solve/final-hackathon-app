@@ -26,7 +26,8 @@ import {
   Camera, 
   XCircle, 
   ArrowRight,
-  Shield
+  Shield,
+  CreditCard
 } from 'lucide-react-native';
 
 interface TransferRequest {
@@ -427,7 +428,16 @@ export default function Transactions() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Activity</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Activity</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.paymentMethodsButton}
+            onPress={() => router.push('/(tabs)/payment-methods')}
+          >
+            <CreditCard size={20} color="#8B5CF6" />
+            <Text style={styles.paymentMethodsButtonText}>Payment</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Pending Transfer Requests */}
@@ -959,5 +969,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  paymentMethodsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  paymentMethodsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
 });

@@ -13,7 +13,9 @@ import {
   CheckCircle, 
   AlertCircle,
   Clock,
-  XCircle
+  XCircle,
+  CreditCard,
+  Plus
 } from 'lucide-react-native';
 
 export default function Profile() {
@@ -164,7 +166,7 @@ export default function Profile() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Phone Number</Text>
-              <Text style={styles.infoValue}>{formatPhoneNumber(profile?.phoneNumber)}</Text>
+              <Text style={styles.infoValue}>{formatPhoneNumber(profile?.phoneNumber || '')}</Text>
             </View>
           </View>
 
@@ -190,6 +192,22 @@ export default function Profile() {
             </View>
           </View>
 
+          <TouchableOpacity
+            style={styles.infoItem}
+            onPress={() => router.push('/(tabs)/payment-methods')}
+          >
+            <View style={styles.infoIcon}>
+              <CreditCard size={20} color="#8B5CF6" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Payment Methods</Text>
+              <Text style={styles.infoValue}>Manage accounts</Text>
+            </View>
+            <View style={styles.infoArrow}>
+              <Text style={styles.infoArrowText}>›</Text>
+            </View>
+          </TouchableOpacity>
+
           {profile?.ghanaCardNumber && (
             <View style={styles.infoItem}>
               <View style={styles.infoIcon}>
@@ -206,6 +224,14 @@ export default function Profile() {
         </View>
 
         <View style={styles.actions}>
+          <TouchableOpacity 
+            style={styles.depositButton} 
+            onPress={() => router.push('/(tabs)/deposit')}
+          >
+            <Plus size={20} color="#FFFFFF" />
+            <Text style={styles.depositText}>Deposit Money</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
             <LogOut size={20} color="#EF4444" />
             <Text style={styles.signOutText}>Sign Out</Text>
@@ -376,6 +402,21 @@ const styles = StyleSheet.create({
   actions: {
     paddingHorizontal: 24,
     paddingBottom: 32,
+    gap: 16,
+  },
+  depositButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22C55E',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  depositText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   signOutButton: {
     flexDirection: 'row',
@@ -391,6 +432,17 @@ const styles = StyleSheet.create({
   signOutText: {
     color: '#EF4444',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  infoArrow: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoArrowText: {
+    fontSize: 18,
+    color: '#9CA3AF',
     fontWeight: '600',
   },
 });

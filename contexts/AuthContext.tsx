@@ -5,7 +5,8 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
-  User
+  User,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { 
   doc, 
@@ -34,6 +35,8 @@ interface AuthContextType {
   canReceiveMoney: () => boolean;
   canSendMoney: () => boolean;
   canDeposit: () => boolean;
+  refreshProfile: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error?: string; success?: boolean }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,11 +55,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const cachedProfile = await AsyncStorage.getItem('userProfile');
         if (cachedProfile) {
           const parsedProfile = JSON.parse(cachedProfile);
-          console.log('📱 Loaded cached profile data');
+          console.log('📱 Loaded cached profile data:', parsedProfile);
           setProfile(parsedProfile);
+        } else {
+          console.log('📱 No cached profile data found');
         }
       } catch (error) {
-        console.error('Error loading cached profile:', error);
+        console.error('❌ Error loading cached profile:', error);
       }
     };
 
@@ -70,7 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check if email is verified before fetching profile
         if (user.emailVerified) {
           console.log('✅ Email verified, fetching profile...');
-          await fetchProfile(user.uid);
+          try {
+            await fetchProfile(user.uid);
+          } catch (error) {
+            console.error('❌ Error fetching profile in auth state change:', error);
+            setProfile(null);
+            setLoading(false);
+          }
         } else {
           console.log('⚠️ Email not verified yet');
           setProfile(null);
@@ -88,33 +99,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      console.log('🔍 Fetching profile for user:', userId);
       const profileDoc = await getDoc(doc(db, 'profiles', userId));
+      
       if (profileDoc.exists()) {
         const data = profileDoc.data();
+        console.log('📄 Profile data from Firestore:', data);
+        
+        // Helper function to safely convert Firestore timestamps
+        const safeDate = (timestamp: any) => {
+          if (timestamp && typeof timestamp.toDate === 'function') {
+            return timestamp.toDate();
+          }
+          if (timestamp instanceof Date) {
+            return timestamp;
+          }
+          if (timestamp && typeof timestamp === 'string') {
+            return new Date(timestamp);
+          }
+          return new Date();
+        };
+
         const profileData = {
           id: profileDoc.id,
-          fullName: data.fullName,
-          phoneNumber: data.phoneNumber,
-          email: data.email,
-          walletBalance: data.walletBalance,
+          fullName: data.fullName || '',
+          phoneNumber: data.phoneNumber || '',
+          email: data.email || '',
+          walletBalance: data.walletBalance || 0,
           isVerified: data.isVerified || false,
           emailVerified: data.emailVerified || false,
-          ghanaCardFrontUrl: data.ghanaCardFrontUrl,
-          ghanaCardBackUrl: data.ghanaCardBackUrl,
-          selfieUrl: data.selfieUrl,
+          ghanaCardNumber: data.ghanaCardNumber || '',
+          ghanaCardFrontUrl: data.ghanaCardFrontUrl || '',
+          ghanaCardBackUrl: data.ghanaCardBackUrl || '',
+          selfieUrl: data.selfieUrl || '',
           verificationStatus: data.verificationStatus || 'pending',
-          verificationSubmittedAt: data.verificationSubmittedAt?.toDate(),
-          verificationVerifiedAt: data.verificationVerifiedAt?.toDate(),
-          createdAt: data.createdAt.toDate(),
-          updatedAt: data.updatedAt.toDate(),
+          verificationSubmittedAt: safeDate(data.verificationSubmittedAt),
+          verificationVerifiedAt: safeDate(data.verificationVerifiedAt),
+          createdAt: safeDate(data.createdAt),
+          updatedAt: safeDate(data.updatedAt),
         };
         
+        console.log('✅ Processed profile data:', profileData);
+        
         // Store profile data in AsyncStorage for persistence
-        await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+        try {
+          await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+          console.log('💾 Profile data saved to AsyncStorage');
+        } catch (storageError) {
+          console.error('❌ Error saving to AsyncStorage:', storageError);
+        }
+        
         setProfile(profileData);
+        console.log('✅ Profile state updated successfully');
+      } else {
+        console.log('⚠️ No profile document found for user:', userId);
+        setProfile(null);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('❌ Error fetching profile:', error);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
@@ -201,16 +244,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           walletBalance: existingData.walletBalance,
           createdAt: existingData.createdAt,
         });
+        console.log('✅ Updated existing profile for user:', user.uid);
       } else {
         // Create new profile with email verification
         await setDoc(doc(db, 'profiles', user.uid), {
           ...profileData,
           createdAt: new Date(),
         });
+        console.log('✅ Created new profile for user:', user.uid);
       }
+
+      // Fetch the updated profile to load it into the app state
+      await fetchProfile(user.uid);
 
       return { success: true };
     } catch (error: any) {
+      console.error('❌ Sign in error:', error);
       return { error: error.message };
     } finally {
       setLoading(false);
@@ -258,6 +307,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      if (!email) return { error: 'Email is required' };
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  };
+
   const checkEmailVerification = async () => {
     try {
       if (!user) return false;
@@ -288,6 +347,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return !!(profile && profile.isVerified && profile.emailVerified);
   };
 
+  // Manual profile refresh function
+  const refreshProfile = async () => {
+    if (user) {
+      console.log('🔄 Manually refreshing profile...');
+      await fetchProfile(user.uid);
+    }
+  };
+
   const value = {
     user,
     profile,
@@ -302,6 +369,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     canReceiveMoney,
     canSendMoney,
     canDeposit,
+    refreshProfile,
+    resetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -13,7 +13,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Eye, EyeOff, ArrowUpRight, ArrowDownLeft, Send, Activity, Plus, AlertCircle, Shield, TrendingUp, Bell } from 'lucide-react-native';
+import { Eye, EyeOff, ArrowUpRight, ArrowDownLeft, Send, Activity, Plus, AlertCircle, Shield, TrendingUp, Bell, CreditCard } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 interface Transaction {
@@ -26,11 +26,29 @@ interface Transaction {
 }
 
 export default function Wallet() {
-  const { profile, user, canPerformTransactions, canSendMoney, canReceiveMoney, canDeposit } = useAuth();
+  const { profile, user, canPerformTransactions, canSendMoney, canReceiveMoney, canDeposit, refreshProfile } = useAuth();
   const [showBalance, setShowBalance] = useState(true);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingTransfersCount, setPendingTransfersCount] = useState(0);
+
+  // Debug: Log profile state changes
+  useEffect(() => {
+    console.log('🏠 Home screen - Profile state changed:', profile);
+    console.log('🏠 Home screen - User state:', user);
+  }, [profile, user]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchRecentTransactions();
+      await refreshProfile();
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const fetchRecentTransactions = async () => {
     if (!user) return;
@@ -119,7 +137,8 @@ export default function Wallet() {
     setRefreshing(true);
     await Promise.all([
       fetchRecentTransactions(),
-      fetchPendingTransfersCount()
+      fetchPendingTransfersCount(),
+      refreshProfile()
     ]);
     setRefreshing(false);
   };
@@ -164,13 +183,21 @@ export default function Wallet() {
             <Text style={styles.name}>{profile?.fullName}</Text>
             <Text style={styles.welcomeText}>Welcome to PayFlow Ghana</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => router.push('/(tabs)/notifications')}
-          >
-            <Bell size={24} color="#374151" />
-            {/* Add notification badge here if needed */}
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={styles.debugButton}
+              onPress={refreshProfile}
+            >
+              <Text style={styles.debugButtonText}>🔄</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => router.push('/(tabs)/notifications')}
+            >
+              <Bell size={24} color="#374151" />
+              {/* Add notification badge here if needed */}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.balanceCard}>
@@ -241,7 +268,7 @@ export default function Wallet() {
 
           <TouchableOpacity 
             style={[styles.actionCard, !canDeposit() && styles.actionCardDisabled]}
-            onPress={() => canDeposit() ? router.push('/deposit') : null}
+            onPress={() => canDeposit() ? router.push('/(tabs)/deposit') : null}
             disabled={!canDeposit()}
           >
             <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
@@ -275,6 +302,43 @@ export default function Wallet() {
             </View>
           </View>
         )}
+
+        {/* Debug Section - Remove this in production */}
+        {(typeof __DEV__ !== 'undefined' && __DEV__) && (
+          <View style={styles.debugSection}>
+            <Text style={styles.debugTitle}>Debug Info (Dev Only)</Text>
+            <Text style={styles.debugText}>User ID: {user?.uid || 'None'}</Text>
+            <Text style={styles.debugText}>Profile: {profile ? 'Loaded' : 'Not loaded'}</Text>
+            <Text style={styles.debugText}>Email Verified: {user?.emailVerified ? 'Yes' : 'No'}</Text>
+            <Text style={styles.debugText}>Profile ID: {profile?.id || 'None'}</Text>
+            <Text style={styles.debugText}>Full Name: {profile?.fullName || 'None'}</Text>
+            <Text style={styles.debugText}>Wallet Balance: {profile?.walletBalance || 'None'}</Text>
+            <TouchableOpacity 
+              style={styles.debugRefreshButton}
+              onPress={refreshProfile}
+            >
+              <Text style={styles.debugRefreshButtonText}>Manual Refresh Profile</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.paymentMethodsBanner}>
+          <View style={styles.paymentMethodsBannerContent}>
+            <CreditCard size={20} color="#8B5CF6" />
+            <View style={styles.paymentMethodsBannerText}>
+              <Text style={styles.paymentMethodsBannerTitle}>Link Payment Methods</Text>
+              <Text style={styles.paymentMethodsBannerSubtitle}>
+                Add bank accounts and mobile money for easy transactions
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.paymentMethodsBannerButton}
+              onPress={() => router.push('/(tabs)/payment-methods')}
+            >
+              <Text style={styles.paymentMethodsBannerButtonText}>Add Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -352,6 +416,17 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  debugButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  debugButtonText: {
+    fontSize: 20,
   },
   greeting: {
     fontSize: 16,
@@ -532,6 +607,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  paymentMethodsBanner: {
+    backgroundColor: '#F8FAFC',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  paymentMethodsBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  paymentMethodsBannerText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  paymentMethodsBannerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  paymentMethodsBannerSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  paymentMethodsBannerButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  paymentMethodsBannerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   section: {
     paddingHorizontal: 24,
   },
@@ -608,6 +722,38 @@ const styles = StyleSheet.create({
   },
   transactionAmount: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  debugSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  debugTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  debugText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  debugRefreshButton: {
+    backgroundColor: '#E0E7FF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  debugRefreshButtonText: {
+    color: '#3B82F6',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

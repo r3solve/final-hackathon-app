@@ -7,6 +7,10 @@ import { AuthProvider } from '@/contexts/AuthContext';
 export default function RootLayout() {
   useFrameworkReady();
 
+  useEffect(() => {
+    console.log('🚀 Root layout mounted');
+  }, []);
+
   return (
     <AuthProvider>
       <Stack screenOptions={{ headerShown: false }}>

@@ -1,3 +1,4 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { Chrome as Home, Send, Clock, User, Shield, Wallet, Grid2x2, Activity } from 'lucide-react-native';
 import { View, Text, StyleSheet } from 'react-native';
@@ -88,6 +89,18 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="selfie-capture"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="deposit"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="payment-methods"
         options={{
           href: null,
         }}

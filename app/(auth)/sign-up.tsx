@@ -3,13 +3,14 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Mail, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Mail, CheckCircle, Eye, EyeOff } from 'lucide-react-native';
 
 export default function SignUp() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signUpSuccess, setSignUpSuccess] = useState(false);
   const { signUp } = useAuth();
@@ -127,7 +128,7 @@ export default function SignUp() {
             style={styles.input}
             value={email}
             onChangeText={setEmail}
-            placeholder="Enter your email"
+            placeholder="e.g., yourname@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
           />
@@ -139,7 +140,7 @@ export default function SignUp() {
             style={styles.input}
             value={phoneNumber}
             onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
-            placeholder="+233501234567"
+            placeholder="e.g., +233501234567"
             keyboardType="phone-pad"
             maxLength={13}
           />
@@ -150,13 +151,18 @@ export default function SignUp() {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, { flex: 1, borderWidth: 0, backgroundColor: 'transparent', paddingVertical: 0 }]}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -216,6 +222,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     backgroundColor: '#F9FAFB',
+  },
+  passwordContainer: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   button: {
     backgroundColor: '#22C55E',
