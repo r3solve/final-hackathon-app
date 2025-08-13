@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword, sendEmailVerification, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { PINManager } from '@/lib/pin-manager';
 import { Profile } from '@/types/env';
@@ -16,7 +16,9 @@ interface AuthContextType {
   canReceiveMoney: any,
   canDeposit :any,
   refreshProfile:any,
+  updateProfile: (ghanaCardNumber: string, ghanaCardFrontUrl: string, ghanaCardBackUrl: string, verificationStatus: any, verificationSubmittedAt: any) => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfilewithSelfie: (selfieUrl: string, verificationStatus: string, verificationSubmittedAt: Date, isVerified: boolean) => Promise<void>;
   checkPINStatus: () => Promise<void>;
   setPINVerified: (verified: boolean) => void;
   signIn: (email: string, password: string) => Promise<{ success?: boolean; error?: string }>;
@@ -68,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (doc.exists()) {
             const data = doc.data();
             setProfile({
+              id: user.uid,
               fullName: data.fullName || '',
               email: data.email || user.email || '',
               phoneNumber: data.phoneNumber || '',
@@ -80,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           } else {
             const defaultProfile: Profile = {
+              id: user.uid,
               fullName: user.displayName || '',
               email: user.email || '',
               phoneNumber: '',
@@ -152,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (docSnap.exists()) {
         const data = docSnap.data();
         setProfile({
+          id: user.uid,
           fullName: data.fullName || '',
           email: data.email || user.email || '',
           phoneNumber: data.phoneNumber || '',
@@ -199,6 +204,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateProfile = async ( ghanaCardNumber: string,
+        ghanaCardFrontUrl: string,
+        ghanaCardBackUrl: string,
+        verificationStatus: any,
+        verificationSubmittedAt: any,
+        ) => {
+    if (!user) return;
+    try {
+      const profileRef = doc(db, 'profiles', user.uid);
+    await updateDoc(profileRef, {
+      ghanaCardNumber,
+      ghanaCardFrontUrl,
+      ghanaCardBackUrl,
+      verificationStatus,
+    });
+    console.log("Profile updated successfully");    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  };
+
+  const updateProfilewithSelfie = async (
+    selfieUrl: string,
+    verificationStatus: string,
+    verificationSubmittedAt: Date,
+  ) => {
+    if (!user) return;
+    try {
+      const profileRef = doc(db, 'profiles', user.uid);
+      const userId = user.uid;
+      await updateDoc(profileRef, {
+        selfieUrl,
+        verificationStatus,
+        verificationSubmittedAt,
+        userId,
+        isVerified: true, 
+      });
+      console.log("Profile updated successfully");
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     profile,
@@ -209,11 +256,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkPINStatus,
     setPINVerified,
     signIn,
-  signUp,
+    signUp,
     resendVerificationEmail,
+    updateProfilewithSelfie,
     canPerformTransactions,
     canSendMoney,
     canReceiveMoney,
+    updateProfile,
     canDeposit,
     refreshProfile,
   };

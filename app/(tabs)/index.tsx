@@ -293,24 +293,7 @@ export default function Wallet() {
           </View>
         )}
 
-        {/* Debug Section - Remove this in production */}
-        {(typeof __DEV__ !== 'undefined' && __DEV__) && (
-          <View style={styles.debugSection}>
-            <Text style={styles.debugTitle}>Debug Info (Dev Only)</Text>
-            <Text style={styles.debugText}>User ID: {user?.uid || 'None'}</Text>
-            <Text style={styles.debugText}>Profile: {profile ? 'Loaded' : 'Not loaded'}</Text>
-            <Text style={styles.debugText}>Email Verified: {user?.emailVerified ? 'Yes' : 'No'}</Text>
-            <Text style={styles.debugText}>Profile ID: {profile?.id || 'None'}</Text>
-            <Text style={styles.debugText}>Full Name: {profile?.fullName || 'None'}</Text>
-            <Text style={styles.debugText}>Wallet Balance: {profile?.walletBalance || 'None'}</Text>
-            <TouchableOpacity 
-              style={styles.debugRefreshButton}
-              onPress={refreshProfile}
-            >
-              <Text style={styles.debugRefreshButtonText}>Manual Refresh Profile</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+       
 
         <View style={styles.paymentMethodsBanner}>
           <View style={styles.paymentMethodsBannerContent}>
