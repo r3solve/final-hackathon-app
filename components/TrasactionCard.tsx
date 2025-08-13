@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 
 const TrasactionCard = ({transactionData}:{transactionData:any}) => {
   const {
+    id,
     amount,
     senderPhone,
     senderId,
@@ -20,7 +21,7 @@ const TrasactionCard = ({transactionData}:{transactionData:any}) => {
 
     // Get current user from context
     const { user } = require('@/contexts/AuthContext').useAuth();
-  const formattedDate = createdAt ? new Date(createdAt).toLocaleString() : '';
+  const formattedDate = createdAt.toDate().toLocaleString();
 
   const handleApprove = () => {
     Alert.alert('Approve Transaction', `Transaction ID: ${transactionData.id}`);
@@ -57,10 +58,10 @@ const TrasactionCard = ({transactionData}:{transactionData:any}) => {
       {status === 'pending' && (
         <View style={styles.buttonRow}>
           {user?.uid === recieverId && (
-            <Text style={styles.buttonVerify} onPress={() => router.push(`/verify/${transactionData.id}` as any)}>Verify</Text>
+            <Text style={styles.buttonVerify} onPress={() => router.push(`/verify/${id}` as any)}>Verify</Text>
           )}
           {user?.uid === senderId ? (
-            <Text style={{color:"green"}}>Completed</Text>
+          <Text style={styles.buttonVerify} onPress={() => router.push(`/approve/${id}` as any)}>Verify</Text>
           ) : null}
           
         </View>
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
     buttonVerify: {
-        backgroundColor: '#4F46E5',
+        backgroundColor: '#10e159ff',
         color: '#fff',
         paddingVertical: 8,
         paddingHorizontal: 20,
@@ -175,18 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     marginTop: 10,
   },
-  buttonApprove: {
-    backgroundColor: '#29e05dff',
-    color: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginRight: 10,
-    overflow: 'hidden',
-    fontWeight: '700',
-    textAlign: 'center',
-    fontSize: 15,
-  },
+
   buttonCancel: {
     backgroundColor: '#EF4444',
     color: '#fff',

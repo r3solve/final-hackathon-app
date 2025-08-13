@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, orderBy, doc, getDoc } from "firebase/firestore";
 
 import { db } from './firebase';
 
@@ -23,7 +23,7 @@ export const getUserByPhone = async (phone: string) => {
 
 export const createANewTransactionRequest = async (transactionData: any) => {
     try {
-        const transactionRef = collection(db, 'tranferReferRequests');
+        const transactionRef = collection(db, 'transferRequests');
         const docRef = await addDoc(transactionRef, transactionData);
         return { success: true, id: docRef.id };
     } catch (error) {
@@ -54,7 +54,7 @@ export const fetchAllTransactionsForUser = async (userId: string) => {
     try {
         const q = query(
             collection(db, 'transferRequests'),
-            where('recipientId', '==', userId),
+            where('recieverId', '==', userId),
             orderBy('createdAt', 'desc')
         );
         const querySnapshot = await getDocs(q);
@@ -84,6 +84,27 @@ export const fetchTransactionsByStatus = async (userId: string, status: string) 
         return transactions;
     } catch (error) {
         console.error('Error fetching transactions by status:', error);
+        return [];
+    }
+}
+
+
+export const fetchTransactionsUpdatedByReciever = async () => {
+    try {
+        const q = query(
+            collection(db, 'transferRequests'),
+            where('location', '!=', null),
+            where('imageUrl', '!=', null),
+            orderBy('updatedAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        let transactions:any = [];
+        querySnapshot.forEach((doc) => {
+            transactions.push({ id: doc.id, ...doc.data() });
+        });
+        return transactions;
+    } catch (error) {
+        console.error('Error fetching updated transactions by recipient:', error);
         return [];
     }
 }
