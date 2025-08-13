@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView , {PROVIDER_GOOGLE} from 'react-native-maps';
+
 import { useLocalSearchParams, router } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -84,12 +86,12 @@ export default function Approve() {
        <View style={styles.locationSection}>
           {verificationLocation ? (
             <>
-              <Text style={styles.sectionTitle}>Submitted Location</Text>
+              {/* <Text style={styles.sectionTitle}>Submitted Location</Text>
               <Text style={styles.info}>
                 Latitude: {verificationLocation.latitude}
                 {'\n'}
                 Longitude: {verificationLocation.longitude}
-              </Text>
+              </Text> */}
               <TouchableOpacity style={styles.actionButton} onPress={handleViewLocation}>
                 <Text style={styles.actionButtonText}>View Location in Google Maps</Text>
               </TouchableOpacity>
@@ -98,6 +100,12 @@ export default function Approve() {
             <Text style={styles.info}>No location submitted.</Text>
           )}
         </View>
+      <View style={styles.container}>
+      <MapView
+        showsUserLocation
+        provider={PROVIDER_GOOGLE}
+      style={styles.map} />
+    </View>
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.submitButton}
@@ -122,7 +130,7 @@ const styles = StyleSheet.create({
   topCard: {
     backgroundColor: '#fff',
     marginHorizontal: 18,
-    marginTop: 32,
+    marginVertical: 8,
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -130,6 +138,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 3,
+  },
+  map:{
+    width: '100%',
+    height: "80%",
+    borderRadius: 20,
+    marginTop: 16,
+    paddingHorizontal: 18,
   },
   topImage: {
     width: '100%',
