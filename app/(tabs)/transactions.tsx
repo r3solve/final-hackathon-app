@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
+import TrasactionCard from '@/components/TrasactionCard';
 import { 
   collection, 
   query, 
@@ -29,6 +30,7 @@ import {
   Shield,
   CreditCard
 } from 'lucide-react-native';
+import { fetchAllTransactionsByUser, fetchAllTransactionsForUser } from '@/lib/firebase-funcs-';
 
 interface TransferRequest {
   id: string;
@@ -60,171 +62,55 @@ interface Transaction {
 }
 
 export default function Transactions() {
-  const { user, canPerformTransactions } = useAuth();
+  const { user, profile } = useAuth();
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // const [, setTransactions] = useState<Transaction[]>([]);
+  // const [allMyTransactions, setAllMyTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Check if user can perform transactions
-  // if (!canPerformTransactions()) {
-  //   return (
-  //     <SafeAreaView style={styles.container}>
-  //       <ScrollView showsVerticalScrollIndicator={false}>
-  //         <View style={styles.header}>
-  //           <Text style={styles.title}>Activity</Text>
-  //           <Text style={styles.subtitle}>View your transaction history</Text>
-  //         </View>
+  if (!user?.emailVerified) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Activity</Text>
+            <Text style={styles.subtitle}>View your transaction history</Text>
+          </View>
 
-  //         <View style={styles.verificationRequiredCard}>
-  //           <View style={styles.verificationRequiredIcon}>
-  //             <Shield size={48} color="#F59E0B" />
-  //           </View>
-  //           <Text style={styles.verificationRequiredTitle}>Verification Required</Text>
-  //           <Text style={styles.verificationRequiredMessage}>
-  //             You need to complete your identity verification before you can view your transaction history. This helps us ensure the security of all transactions.
-  //           </Text>
-  //           <TouchableOpacity
-  //             style={styles.verificationRequiredButton}
-  //             onPress={() => router.push('/(tabs)/document-upload')}
-  //           >
-  //             <Shield size={20} color="#FFFFFF" />
-  //             <Text style={styles.verificationRequiredButtonText}>Complete Verification</Text>
-  //           </TouchableOpacity>
-  //         </View>
-  //       </ScrollView>
-  //     </SafeAreaView>
-  //   );
-  // }
+          <View style={styles.verificationRequiredCard}>
+            <View style={styles.verificationRequiredIcon}>
+              <Shield size={48} color="#F59E0B" />
+            </View>
+            <Text style={styles.verificationRequiredTitle}>Verification Required</Text>
+            <Text style={styles.verificationRequiredMessage}>
+              You need to complete your identity verification before you can view your transaction history. This helps us ensure the security of all transactions.
+            </Text>
+            <TouchableOpacity
+              style={styles.verificationRequiredButton}
+              onPress={() => router.push('/document-upload')}
+            >
+              <Shield size={20} color="#FFFFFF" />
+              <Text style={styles.verificationRequiredButtonText}>Complete Verification</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   const fetchData = async () => {
-    return
+    
     if (!user) return;
 
     try {
       // Fetch pending transfer requests
-      const sentRequestsQuery = query(
-        collection(db, 'transactions'),
-        where('senderId', '==', user.uid),
-        where('status', 'in', ['pending', 'verified']),
-        orderBy('createdAt', 'desc')
-      );
-
-      const receivedRequestsQuery = query(
-        collection(db, 'transactions'),
-        where('recipientId', '==', user.uid),
-        where('status', 'in', ['pending', 'verified']),
-        orderBy('createdAt', 'desc')
-      );
-
-      const [sentSnapshot, receivedSnapshot] = await Promise.all([
-        getDocs(sentRequestsQuery),
-        getDocs(receivedRequestsQuery)
-      ]);
-
-      const allRequests: TransferRequest[] = [];
-
-      // Process sent requests
-      for (const docSnapshot of sentSnapshot.docs) {
-        const data = docSnapshot.data();
-        const recipientDoc = await getDoc(doc(db, 'profiles', data.recipientId));
-        const recipientData = recipientDoc.data();
-        
-        allRequests.push({
-          id: docSnapshot.id,
-          senderId: data.senderId,
-          recipientId: data.recipientId,
-          amount: data.amount,
-          status: data.status,
-          verificationSelfieUrl: data.verificationSelfieUrl,
-          verificationLocation: data.verificationLocation,
-          createdAt: data.createdAt.toDate(),
-          verifiedAt: data.verifiedAt?.toDate(),
-          completedAt: data.completedAt?.toDate(),
-          senderName: '',
-          recipientName: recipientData?.fullName || 'Unknown',
-          type: 'sent',
-        });
-      }
-
-      // Process received requests
-      for (const docSnapshot of receivedSnapshot.docs) {
-        const data = docSnapshot.data();
-        const senderDoc = await getDoc(doc(db, 'profiles', data.senderId));
-        const senderData = senderDoc.data();
-        
-        allRequests.push({
-          id: docSnapshot.id,
-          senderId: data.senderId,
-          recipientId: data.recipientId,
-          amount: data.amount,
-          status: data.status,
-          verificationSelfieUrl: data.verificationSelfieUrl,
-          verificationLocation: data.verificationLocation,
-          createdAt: data.createdAt.toDate(),
-          verifiedAt: data.verifiedAt?.toDate(),
-          completedAt: data.completedAt?.toDate(),
-          senderName: senderData?.fullName || 'Unknown',
-          recipientName: '',
-          type: 'received',
-        });
-      }
-
-      setTransferRequests(allRequests);
-
-      // Fetch completed transactions
-      const sentTransactionsQuery = query(
-        collection(db, 'transactions'),
-        where('senderId', '==', user.uid),
-        orderBy('createdAt', 'desc')
-      );
-
-      const receivedTransactionsQuery = query(
-        collection(db, 'transactions'),
-        where('recipientId', '==', user.uid),
-        orderBy('createdAt', 'desc')
-      );
-
-      const [sentTxSnapshot, receivedTxSnapshot] = await Promise.all([
-        getDocs(sentTransactionsQuery),
-        getDocs(receivedTransactionsQuery)
-      ]);
-
-      const allTransactions: Transaction[] = [];
-
-      // Process sent transactions
-      for (const docSnapshot of sentTxSnapshot.docs) {
-        const data = docSnapshot.data();
-        const recipientDoc = await getDoc(doc(db, 'profiles', data.recipientId));
-        const recipientData = recipientDoc.data();
-        
-        allTransactions.push({
-          id: docSnapshot.id,
-          amount: data.amount,
-          createdAt: data.createdAt.toDate(),
-          senderName: '',
-          recipientName: recipientData?.fullName || 'Unknown',
-          type: 'sent',
-        });
-      }
-
-      // Process received transactions
-      for (const docSnapshot of receivedTxSnapshot.docs) {
-        const data = docSnapshot.data();
-        const senderDoc = await getDoc(doc(db, 'profiles', data.senderId));
-        const senderData = senderDoc.data();
-        
-        allTransactions.push({
-          id: docSnapshot.id,
-          amount: data.amount,
-          createdAt: data.createdAt.toDate(),
-          senderName: senderData?.fullName || 'Unknown',
-          recipientName: '',
-          type: 'received',
-        });
-      }
-
-      setTransactions(allTransactions);
+      const allPending = await fetchAllTransactionsForUser(user?.uid);
+    
+      setTransferRequests(allPending)
+      // setAllMyTransactions(allPending)
+      console.log('Fetched all send requests:', allPending);
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -245,7 +131,7 @@ export default function Transactions() {
       const transfersQuery = query(
         collection(db, 'transferRequests'),
         where('senderId', '==', user.uid),
-        where('status', 'in', ['pending', 'verified'])
+        
       );
 
       const unsubscribe = onSnapshot(transfersQuery, (snapshot) => {
@@ -306,7 +192,7 @@ export default function Transactions() {
 
   const handleTransferRequestPress = (request: TransferRequest) => {
     if (request.type === 'received' && request.status === 'pending') {
-      router.push(`/(tabs)/verify/${request.id}`);
+      // router.push(`/verify/${request.id}`);
     }
   };
 
@@ -423,6 +309,10 @@ export default function Transactions() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View>
+        <TouchableOpacity>Pending</TouchableOpacity>
+        <TouchableOpacity>Completed</TouchableOpacity>
+      </View>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -434,195 +324,31 @@ export default function Transactions() {
           </View>
           <TouchableOpacity
             style={styles.paymentMethodsButton}
-            onPress={() => router.push('/(tabs)/payment-methods')}
+            onPress={() => router.push('/payment-methods')}
           >
             <CreditCard size={20} color="#8B5CF6" />
             <Text style={styles.paymentMethodsButtonText}>Payment</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Pending Transfer Requests */}
+
+        {/* All Transactions */}
         {transferRequests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Pending Transfers</Text>
-            <View style={styles.itemsList}>
-              {transferRequests.map((request) => (
-                <View key={request.id} style={styles.requestCard}>
-                  <View style={styles.requestHeader}>
-                    <View style={styles.recipientInfo}>
-                      <View style={styles.avatar}>
-                        <User size={20} color="#6B7280" />
-                      </View>
-                      <View>
-                        <Text style={styles.recipientName}>
-                          {request.type === 'sent' 
-                            ? request.recipientName
-                            : request.senderName
-                          }
-                        </Text>
-                        <Text style={styles.recipientPhone}>
-                          {request.type === 'sent' ? 'Recipient' : 'Sender'}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.amountContainer}>
-                      <Text style={styles.amount}>{formatCurrency(request.amount)}</Text>
-                      <Text style={styles.status}>
-                        {request.status === 'pending' ? 'Pending Verification' : 'Verified'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.transferDetails}>
-                    <Text style={styles.dateText}>
-                      Requested: {formatDate(request.createdAt)}
-                    </Text>
-                    
-                    {request.verifiedAt && (
-                      <Text style={styles.dateText}>
-                        Verified: {formatDate(request.verifiedAt)}
-                      </Text>
-                    )}
-                  </View>
-
-                  {request.status === 'verified' && request.type === 'sent' && (
-                    <View style={styles.verificationSection}>
-                      <Text style={styles.verificationTitle}>Recipient Verification</Text>
-                      
-                      <View style={styles.verificationItems}>
-                        <View style={styles.verificationItem}>
-                          <View style={styles.verificationIcon}>
-                            <Camera size={16} color="#22C55E" />
-                          </View>
-                          <Text style={styles.verificationText}>Selfie Verified</Text>
-                        </View>
-                        
-                        <View style={styles.verificationItem}>
-                          <View style={styles.verificationIcon}>
-                            <MapPin size={16} color="#22C55E" />
-                          </View>
-                          <Text style={styles.verificationText}>Location Captured</Text>
-                        </View>
-                      </View>
-
-                      {request.verificationSelfieUrl && (
-                        <View style={styles.selfieContainer}>
-                          <Text style={styles.selfieLabel}>Recipient's Selfie:</Text>
-                          <Image 
-                            source={{ uri: request.verificationSelfieUrl }} 
-                            style={styles.selfieImage}
-                          />
-                        </View>
-                      )}
-
-                      {request.verificationLocation && (
-                        <TouchableOpacity 
-                          style={styles.locationContainer}
-                          onPress={() => openMap(request.verificationLocation!)}
-                        >
-                          <Text style={styles.locationLabel}>Recipient's Location:</Text>
-                          <View style={styles.locationInfo}>
-                            <MapPin size={16} color="#3B82F6" />
-                            <Text style={styles.locationText}>
-                              {request.verificationLocation.latitude.toFixed(4)}, {request.verificationLocation.longitude.toFixed(4)}
-                            </Text>
-                            <ArrowRight size={16} color="#3B82F6" />
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-
-                  <View style={styles.actions}>
-                    {request.type === 'received' && request.status === 'pending' ? (
-                      <TouchableOpacity
-                        style={styles.verifyButton}
-                        onPress={() => handleTransferRequestPress(request)}
-                      >
-                        <Text style={styles.verifyButtonText}>Verify & Approve</Text>
-                      </TouchableOpacity>
-                    ) : request.type === 'sent' && request.status === 'verified' ? (
-                      <TouchableOpacity
-                        style={[styles.approveButton, loading && styles.buttonDisabled]}
-                        onPress={() => handleApproveTransfer(request)}
-                        disabled={loading}
-                      >
-                        <CheckCircle size={20} color="#FFFFFF" />
-                        <Text style={styles.approveButtonText}>
-                          {loading ? 'Processing...' : 'Approve Transfer'}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={styles.pendingStatus}>
-                        <Clock size={16} color="#F59E0B" />
-                        <Text style={styles.pendingText}>
-                          {request.status === 'pending' ? 'Waiting for recipient verification...' : 'Waiting for approval...'}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={() => handleCancelTransfer(request)}
-                    >
-                      <XCircle size={20} color="#EF4444" />
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
+          <View style={{paddingHorizontal: 16}}>
+            <Text style={{fontSize: 18, fontWeight: '600', marginBottom: 8}}>All Transactions</Text>
+            {transferRequests.map((txn) => (
+              <TrasactionCard key={txn.id} transactionData={txn} />
+            ))}
           </View>
         )}
 
-        {/* Completed Transactions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transaction History</Text>
-          {transactions.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No completed transactions</Text>
-              <Text style={styles.emptySubtext}>Your completed transfers will appear here</Text>
-            </View>
-          ) : (
-            <View style={styles.itemsList}>
-              {transactions.map((transaction) => (
-                <View key={transaction.id} style={styles.transactionItem}>
-                  <View style={styles.transactionIcon}>
-                    {transaction.type === 'sent' ? (
-                      <ArrowUpRight size={16} color="#EF4444" />
-                    ) : (
-                      <ArrowDownLeft size={16} color="#22C55E" />
-                    )}
-                  </View>
-                  <View style={styles.transactionDetails}>
-                    <Text style={styles.transactionName}>
-                      {transaction.type === 'sent' 
-                        ? `To ${transaction.recipientName}`
-                        : `From ${transaction.senderName}`
-                      }
-                    </Text>
-                    <View style={styles.completedStatus}>
-                      <CheckCircle size={14} color="#22C55E" />
-                      <Text style={styles.completedText}>Completed</Text>
-                    </View>
-                    <Text style={styles.transactionDate}>
-                      {formatDate(transaction.createdAt)}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
-                      { color: transaction.type === 'sent' ? '#EF4444' : '#22C55E' }
-                    ]}
-                  >
-                    {transaction.type === 'sent' ? '-' : '+'}
-                    {formatCurrency(transaction.amount)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        {/* Empty State */}
+        {transferRequests.length === 0 && transferRequests.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No transactions found</Text>
+            <Text style={styles.emptySubtext}>You have not made or received any transactions yet.</Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
