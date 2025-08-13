@@ -54,7 +54,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     } else {
       // Mark onboarding as completed and call onComplete
       try {
-        await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+         AsyncStorage.setItem('hasSeenOnboarding', 'true');
       } catch (error) {
         console.error('Error saving onboarding status:', error);
       }

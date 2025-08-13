@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { PINManager } from '@/lib/pin-manager';
@@ -14,6 +14,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   checkPINStatus: () => Promise<void>;
   setPINVerified: (verified: boolean) => void;
+  signIn: (email: string, password: string) => Promise<{ success?: boolean; error?: string }>;
+  resendVerificationEmail: () => Promise<{ success?: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,10 +76,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPINVerified(false);
         setHasPIN(false);
       }
-      setLoading(false);
+    
     });
+    setLoading(false);
     return unsubscribe;
   }, []);
+
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const currentUser = userCredential.user;
+      
+      if (currentUser && !currentUser.emailVerified) {
+        await sendEmailVerification(currentUser);
+        return { error: 'Please verify your email. A verification link has been sent.' };
+      }
+  
+
+      return { success: true };
+    } catch (err: any) {
+      console.error(err);
+      return { error: err.message || 'Failed to sign in' };
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    try {
+      if (!auth.currentUser) {
+        return { error: 'No user is signed in' };
+      }
+
+      await sendEmailVerification(auth.currentUser);
+      return { success: true };
+    } catch (err: any) {
+      console.error(err);
+      return { error: err.message || 'Failed to send verification email' };
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -105,6 +141,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut: handleSignOut,
     checkPINStatus,
     setPINVerified,
+    signIn,
+    resendVerificationEmail,
   };
 
   return (
