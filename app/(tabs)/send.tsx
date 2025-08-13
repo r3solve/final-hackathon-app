@@ -67,8 +67,8 @@ export default function SendScreen() {
       isApprovedBySender: false,
       isApprovedByRecipient: false,
       status: 'pending',
-      liveLocation: null, // Assuming live location is not used here
-      selfiePhotoUrl: null, // Assuming no selfie photo is required for this transfer
+      liveLocation: null,
+      selfiePhotoUrl: null, 
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -83,12 +83,11 @@ export default function SendScreen() {
         {
           text: 'OK',
           onPress: () => {
-            // Reset form
+           
 
             setRecipientPhone('');
             setAmount('');
             setNote('');
-            // Navigate back to profile
             router.back();
           },
         },
@@ -155,7 +154,7 @@ export default function SendScreen() {
           
           <View style={styles.amountInputContainer}>
             <View style={styles.currencyIcon}>
-              <DollarSign size={24} color="#22C55E" />
+              
             </View>
             <TextInput
               style={styles.amountInput}

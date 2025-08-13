@@ -112,6 +112,7 @@ export default function DocumentUpload() {
     setLoading(true);
     try {
       const userId = profile?.id;
+      console.log('User ID:', userId);
       if (!userId) throw new Error('User not found');
 
       // Upload images to Firebase Storage
@@ -127,13 +128,13 @@ export default function DocumentUpload() {
       setUploadingBack(false);
 
       // Update profile with verification documents
-      await updateProfile({
-        ghanaCardNumber: ghanaCardNumber.trim(),
+      await updateProfile(
+        ghanaCardNumber.trim(),
         ghanaCardFrontUrl,
         ghanaCardBackUrl,
-        verificationStatus: 'submitted',
-        verificationSubmittedAt: new Date(),
-      });
+        'submitted',
+        new Date()
+      );
 
       // Navigate to selfie capture screen
       router.push('/(tabs)/selfie-capture');

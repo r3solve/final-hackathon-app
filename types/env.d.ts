@@ -25,6 +25,7 @@ export interface PINCreationResult {
 
 // Profile Types
 export interface Profile {
+  id: string;
   fullName: string;
   email: string;
   phoneNumber: string;
