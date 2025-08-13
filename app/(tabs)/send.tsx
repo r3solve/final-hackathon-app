@@ -5,13 +5,16 @@ import { ArrowLeft,  User, Phone, DollarSign, Send } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import PINVerificationModal from '@/components/PINVerificationModal';
+import { createANewTransactionRequest, getUserByPhone } from '@/lib/firebase-funcs-';
+import { formatPhoneNumber } from '@/lib/utils';
 
 export default function SendScreen() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [recipientPhone, setRecipientPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [showPINModal, setShowPINModal] = useState(false);
+
 
   const handleSendMoney = () => {
     if (!recipientPhone.trim()) {
@@ -44,8 +47,35 @@ export default function SendScreen() {
     setShowPINModal(true);
   };
 
-  const handlePINVerificationSuccess = () => {
+  const handlePINVerificationSuccess = async () => {
     // PIN verified successfully - proceed with money transfer
+    const recipientPhoneFormatted = formatPhoneNumber(recipientPhone);
+    const reciever =  await getUserByPhone(recipientPhoneFormatted);
+   
+    if (!reciever) {
+      Alert.alert('Error', 'Recipient not found');
+      return;
+    }
+    
+    const transactionData = {
+      senderPhone: profile?.phoneNumber ,
+      senderId: user?.uid,
+      recieverId: reciever.id,
+      recieverPhone: reciever.phoneNumber,
+      amount: parseFloat(amount),
+      description: note.trim(),
+      isApprovedBySender: false,
+      isApprovedByRecipient: false,
+      status: 'pending',
+      liveLocation: null, // Assuming live location is not used here
+      selfiePhotoUrl: null, // Assuming no selfie photo is required for this transfer
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+
+    await createANewTransactionRequest(transactionData);
+
+
     Alert.alert(
       'Transfer Successful!',
       `You have successfully sent ₵${parseFloat(amount).toFixed(2)} to ${recipientPhone}`,
@@ -54,6 +84,7 @@ export default function SendScreen() {
           text: 'OK',
           onPress: () => {
             // Reset form
+
             setRecipientPhone('');
             setAmount('');
             setNote('');

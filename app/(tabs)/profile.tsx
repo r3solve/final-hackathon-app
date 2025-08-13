@@ -188,7 +188,7 @@ export default function Profile() {
 
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => router.push('/(tabs)/document-upload')}
+              onPress={() => router.push('/document-upload')}
             >
               <Shield size={24} color="#F59E0B" />
               <Text style={styles.actionText}>Verification</Text>

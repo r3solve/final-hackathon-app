@@ -67,50 +67,51 @@ export default function Transactions() {
   const [loading, setLoading] = useState(false);
 
   // Check if user can perform transactions
-  if (!canPerformTransactions()) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Activity</Text>
-            <Text style={styles.subtitle}>View your transaction history</Text>
-          </View>
+  // if (!canPerformTransactions()) {
+  //   return (
+  //     <SafeAreaView style={styles.container}>
+  //       <ScrollView showsVerticalScrollIndicator={false}>
+  //         <View style={styles.header}>
+  //           <Text style={styles.title}>Activity</Text>
+  //           <Text style={styles.subtitle}>View your transaction history</Text>
+  //         </View>
 
-          <View style={styles.verificationRequiredCard}>
-            <View style={styles.verificationRequiredIcon}>
-              <Shield size={48} color="#F59E0B" />
-            </View>
-            <Text style={styles.verificationRequiredTitle}>Verification Required</Text>
-            <Text style={styles.verificationRequiredMessage}>
-              You need to complete your identity verification before you can view your transaction history. This helps us ensure the security of all transactions.
-            </Text>
-            <TouchableOpacity
-              style={styles.verificationRequiredButton}
-              onPress={() => router.push('/(tabs)/document-upload')}
-            >
-              <Shield size={20} color="#FFFFFF" />
-              <Text style={styles.verificationRequiredButtonText}>Complete Verification</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  //         <View style={styles.verificationRequiredCard}>
+  //           <View style={styles.verificationRequiredIcon}>
+  //             <Shield size={48} color="#F59E0B" />
+  //           </View>
+  //           <Text style={styles.verificationRequiredTitle}>Verification Required</Text>
+  //           <Text style={styles.verificationRequiredMessage}>
+  //             You need to complete your identity verification before you can view your transaction history. This helps us ensure the security of all transactions.
+  //           </Text>
+  //           <TouchableOpacity
+  //             style={styles.verificationRequiredButton}
+  //             onPress={() => router.push('/(tabs)/document-upload')}
+  //           >
+  //             <Shield size={20} color="#FFFFFF" />
+  //             <Text style={styles.verificationRequiredButtonText}>Complete Verification</Text>
+  //           </TouchableOpacity>
+  //         </View>
+  //       </ScrollView>
+  //     </SafeAreaView>
+  //   );
+  // }
 
   const fetchData = async () => {
+    return
     if (!user) return;
 
     try {
       // Fetch pending transfer requests
       const sentRequestsQuery = query(
-        collection(db, 'transferRequests'),
+        collection(db, 'transactions'),
         where('senderId', '==', user.uid),
         where('status', 'in', ['pending', 'verified']),
         orderBy('createdAt', 'desc')
       );
 
       const receivedRequestsQuery = query(
-        collection(db, 'transferRequests'),
+        collection(db, 'transactions'),
         where('recipientId', '==', user.uid),
         where('status', 'in', ['pending', 'verified']),
         orderBy('createdAt', 'desc')

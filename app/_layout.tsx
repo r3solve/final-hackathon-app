@@ -58,6 +58,7 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="document-upload" options={{ title: 'Verify', headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
     </>
