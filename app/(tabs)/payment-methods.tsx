@@ -7,7 +7,7 @@ import {
   ArrowLeft, 
   Plus, 
   CreditCard, 
-  Bank, 
+  Banknote,
   Shield,
   Trash2,
   Edit3,
@@ -40,7 +40,6 @@ export default function PaymentMethods() {
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Form states
   const [methodType, setMethodType] = useState<'bank' | 'mobile_money' | 'card'>('bank');
   const [methodName, setMethodName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -60,7 +59,7 @@ export default function PaymentMethods() {
     if (!user) return;
 
     const unsubscribe = onSnapshot(
-      collection(db, 'profile', user.uid, 'paymentMethods'),
+      collection(db, 'profiles', user.uid, 'paymentMethods'),
       (snapshot) => {
         const methods: PaymentMethod[] = [];
         snapshot.forEach((doc) => {
@@ -118,7 +117,7 @@ export default function PaymentMethods() {
         }),
       };
 
-      const methodRef = doc(collection(db, 'profile', user.uid, 'paymentMethods'));
+      const methodRef = doc(collection(db, 'profiles', user.uid, 'paymentMethods'));
       await setDoc(methodRef, newMethod);
 
       Alert.alert('Success', 'Payment method added successfully!');
@@ -158,7 +157,7 @@ export default function PaymentMethods() {
         }),
       };
 
-      await updateDoc(doc(db, 'profile', user.uid, 'paymentMethods', editingMethod.id), updatedMethod);
+      await updateDoc(doc(db, 'profiles', user.uid, 'paymentMethods', editingMethod.id), updatedMethod);
 
       Alert.alert('Success', 'Payment method updated successfully!');
       setShowEditModal(false);
@@ -185,7 +184,7 @@ export default function PaymentMethods() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteDoc(doc(db, 'users', user.uid, 'paymentMethods', methodId));
+              await deleteDoc(doc(db, 'profiles', user.uid, 'paymentMethods', methodId));
               Alert.alert('Success', 'Payment method deleted successfully!');
             } catch (error) {
               console.error('Error deleting payment method:', error);
@@ -201,14 +200,12 @@ export default function PaymentMethods() {
     if (!user) return;
 
     try {
-      // Remove default from all methods
       const batch = paymentMethods.map(method =>
-        updateDoc(doc(db, 'users', user.uid, 'paymentMethods', method.id), { isDefault: false })
+        updateDoc(doc(db, 'profiles', user.uid, 'paymentMethods', method.id), { isDefault: false })
       );
 
-      // Set new default
       await Promise.all(batch);
-      await updateDoc(doc(db, 'users', user.uid, 'paymentMethods', methodId), { isDefault: true });
+      await updateDoc(doc(db, 'profiles', user.uid, 'paymentMethods', methodId), { isDefault: true });
 
       Alert.alert('Success', 'Default payment method updated!');
     } catch (error) {
@@ -234,7 +231,7 @@ export default function PaymentMethods() {
     <View style={styles.methodCard}>
       <View style={styles.methodHeader}>
         <View style={styles.methodIcon}>
-          {item.type === 'bank' && <Bank size={24} color="#3B82F6" />}
+          {item.type === 'bank' && <Banknote size={24} color="#3B82F6" />}
           {item.type === 'mobile_money' && <CreditCard size={24} color="#8B5CF6" />}
           {item.type === 'card' && <CreditCard size={24} color="#22C55E" />}
         </View>

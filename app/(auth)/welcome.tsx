@@ -9,7 +9,7 @@ export default function Welcome() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>PayFlow</Text>
+          <Text style={styles.title}>Astra Pay</Text>
           <Text style={styles.subtitle}>Send money instantly with secure verification</Text>
         </View>
 

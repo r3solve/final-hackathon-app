@@ -1,8 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Plus, Users, DollarSign, Trash2, Edit3, UserPlus, Send } from 'lucide-react-native';
+import { ArrowLeft, Plus, Users, DollarSign, Trash2, UserPlus, Send } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { db } from '@/lib/firebase';
+
+import {
+  addDoc,
+  arrayUnion,
+  collection,
+  deleteDoc,
+  doc,
+  increment,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+} from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface GroupMember {
@@ -18,55 +34,92 @@ interface PaymentGroup {
   description: string;
   members: GroupMember[];
   totalAmount: number;
-  createdAt: Date;
+  createdAt: Date | Timestamp | null;
   createdBy: string;
 }
 
 export default function GroupedPayments() {
-  const { user, profile } = useAuth();
   const [groups, setGroups] = useState<PaymentGroup[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<PaymentGroup | null>(null);
+  const { user, profile } = useAuth();
   
+
   // Create group form state
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
-  
+
   // Add member form state
   const [memberName, setMemberName] = useState('');
   const [memberPhone, setMemberPhone] = useState('');
   const [memberAmount, setMemberAmount] = useState('');
 
-  const handleBackToProfile = () => {
-    router.back();
+  // --- Helpers ---
+  const toJSDate = (ts: Date | Timestamp | null | undefined): Date | null => {
+    if (!ts) return null;
+    if (ts instanceof Date) return ts;
+    if (ts instanceof Timestamp) return ts.toDate();
+    return null;
   };
 
-  const handleCreateGroup = () => {
+  // --- Read groups in realtime ---
+  useEffect(() => {
+    const q = query(collection(db, 'grouped-payments'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snap) => {
+      const data: PaymentGroup[] = snap.docs.map((d) => {
+        const raw = d.data() as Omit<PaymentGroup, 'id'>;
+        return {
+          id: d.id,
+          name: (raw as any).name ?? '',
+          description: (raw as any).description ?? '',
+          members: (raw as any).members ?? [],
+          totalAmount: (raw as any).totalAmount ?? 0,
+          createdAt: (raw as any).createdAt ?? null,
+          createdBy: (raw as any).createdBy ?? '',
+        };
+      });
+      setGroups(data);
+    });
+    return () => unsub();
+  }, []);
+
+  // --- Create Group ---
+  const handleCreateGroup = async () => {
     if (!groupName.trim()) {
       Alert.alert('Error', 'Group name is required');
       return;
     }
 
-    const newGroup: PaymentGroup = {
-      id: Date.now().toString(),
+    const newGroup = {
       name: groupName.trim(),
       description: groupDescription.trim(),
-      members: [],
+      members: [] as GroupMember[],
       totalAmount: 0,
-      createdAt: new Date(),
-      createdBy: user?.uid || '',
+      createdAt: serverTimestamp(),
+      createdBy: user?.uid, // fill with auth uid if available
     };
 
-    setGroups(prev => [newGroup, ...prev]);
-    setGroupName('');
-    setGroupDescription('');
-    setShowCreateModal(false);
-    
-    Alert.alert('Success', 'Group created successfully!');
+    try {
+      await addDoc(collection(db, 'grouped-payments'), newGroup);
+      setGroupName('');
+      setGroupDescription('');
+      setShowCreateModal(false);
+      Alert.alert('Success', 'Group created successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to create group: ' + error.message);
+    }
   };
 
-  const handleAddMember = () => {
+  const addMemberToGroupFS = async (groupId: string, member: GroupMember) => {
+    const groupRef = doc(db, 'grouped-payments', groupId);
+    await updateDoc(groupRef, {
+      members: arrayUnion(member),
+      totalAmount: increment(member.amount),
+    });
+  };
+
+  const handleAddMember = async () => {
     if (!memberName.trim() || !memberPhone.trim() || !memberAmount.trim()) {
       Alert.alert('Error', 'All fields are required');
       return;
@@ -84,28 +137,23 @@ export default function GroupedPayments() {
       id: Date.now().toString(),
       name: memberName.trim(),
       phoneNumber: memberPhone.trim(),
-      amount: amount,
+      amount,
     };
 
-    const updatedGroup = {
-      ...selectedGroup,
-      members: [...selectedGroup.members, newMember],
-      totalAmount: selectedGroup.totalAmount + amount,
-    };
-
-    setGroups(prev => prev.map(group => 
-      group.id === selectedGroup.id ? updatedGroup : group
-    ));
-
-    setMemberName('');
-    setMemberPhone('');
-    setMemberAmount('');
-    setShowAddMemberModal(false);
-    setSelectedGroup(null);
-    
-    Alert.alert('Success', 'Member added successfully!');
+    try {
+      await addMemberToGroupFS(selectedGroup.id, newMember);
+      setMemberName('');
+      setMemberPhone('');
+      setMemberAmount('');
+      setShowAddMemberModal(false);
+      setSelectedGroup(null);
+      Alert.alert('Success', 'Member added successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to add member: ' + error.message);
+    }
   };
 
+  // --- Delete Group ---
   const handleDeleteGroup = (groupId: string) => {
     Alert.alert(
       'Delete Group',
@@ -115,8 +163,14 @@ export default function GroupedPayments() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setGroups(prev => prev.filter(group => group.id !== groupId));
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, 'grouped-payments', groupId));
+              // onSnapshot will auto-update list
+              Alert.alert('Success', 'Group deleted successfully!');
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to delete group: ' + error.message);
+            }
           },
         },
       ]
@@ -124,20 +178,21 @@ export default function GroupedPayments() {
   };
 
   const handleSendGroupPayment = (group: PaymentGroup) => {
-    if (group.members.length === 0) {
+    if (!group.members || group.members.length === 0) {
       Alert.alert('Error', 'Group has no members to send payments to');
       return;
     }
 
+    const total = group.totalAmount ?? 0;
     Alert.alert(
       'Send Group Payment',
-      `Send payments to ${group.members.length} members for a total of ₵${group.totalAmount.toFixed(2)}?`,
+      `Send payments to ${group.members.length} members for a total of ₵${Number(total).toFixed(2)}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Send',
           onPress: () => {
-            // Here you would implement the actual payment logic
+            // TODO: Implement actual send logic/integration
             Alert.alert('Success', 'Group payments sent successfully!');
           },
         },
@@ -145,105 +200,96 @@ export default function GroupedPayments() {
     );
   };
 
-  const renderGroupCard = ({ item }: { item: PaymentGroup }) => (
-    <View style={styles.groupCard}>
-      <View style={styles.groupHeader}>
-        <View style={styles.groupInfo}>
-          <Text style={styles.groupName}>{item.name}</Text>
-          <Text style={styles.groupDescription}>{item.description}</Text>
+  const renderGroupCard = ({ item }: { item: PaymentGroup }) => {
+    const createdDate = toJSDate(item.createdAt);
+    return (
+      <View style={styles.groupCard}>
+        <View style={styles.groupHeader}>
+          <View style={styles.groupInfo}>
+            <Text style={styles.groupName}>{item.name}</Text>
+            {!!item.description && <Text style={styles.groupDescription}>{item.description}</Text>}
+          </View>
+          <View style={styles.groupActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setSelectedGroup(item);
+                setShowAddMemberModal(true);
+              }}
+            >
+              <UserPlus size={16} color="#22C55E" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteGroup(item.id)}>
+              <Trash2 size={16} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.groupActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {
-              setSelectedGroup(item);
-              setShowAddMemberModal(true);
-            }}
-          >
-            <UserPlus size={16} color="#22C55E" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleDeleteGroup(item.id)}
-          >
-            <Trash2 size={16} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <View style={styles.groupStats}>
-        <View style={styles.statItem}>
-          <Users size={16} color="#6B7280" />
-          <Text style={styles.statText}>{item.members.length} members</Text>
+        <View style={styles.groupStats}>
+          <View style={styles.statItem}>
+            <Users size={16} color="#6B7280" />
+            <Text style={styles.statText}>{item.members?.length ?? 0} members</Text>
+          </View>
+          <View style={styles.statItem}>
+            <DollarSign size={16} color="#6B7280" />
+            <Text style={styles.statText}>₵{Number(item.totalAmount || 0).toFixed(2)}</Text>
+          </View>
         </View>
-        <View style={styles.statItem}>
-          <DollarSign size={16} color="#6B7280" />
-          <Text style={styles.statText}>₵{item.totalAmount.toFixed(2)}</Text>
-        </View>
-      </View>
 
-      {item.members.length > 0 && (
-        <View style={styles.membersSection}>
-          <Text style={styles.membersTitle}>Members:</Text>
-          {item.members.map((member, index) => (
-            <View key={member.id} style={styles.memberItem}>
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberPhone}>{member.phoneNumber}</Text>
+        {!!item.members?.length && (
+          <View style={styles.membersSection}>
+            <Text style={styles.membersTitle}>Members:</Text>
+            {item.members.map((member) => (
+              <View key={member.id} style={styles.memberItem}>
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{member.name}</Text>
+                  <Text style={styles.memberPhone}>{member.phoneNumber}</Text>
+                </View>
+                <Text style={styles.memberAmount}>₵{Number(member.amount).toFixed(2)}</Text>
               </View>
-              <Text style={styles.memberAmount}>₵{member.amount.toFixed(2)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+            ))}
+          </View>
+        )}
 
-      <View style={styles.groupFooter}>
-        <Text style={styles.groupDate}>
-          Created {item.createdAt.toLocaleDateString()}
-        </Text>
-        <TouchableOpacity
-          style={styles.sendPaymentButton}
-          onPress={() => handleSendGroupPayment(item)}
-          disabled={item.members.length === 0}
-        >
-          <Send size={16} color="#FFFFFF" />
-          <Text style={styles.sendPaymentButtonText}>Send Payments</Text>
-        </TouchableOpacity>
+        <View style={styles.groupFooter}>
+          <Text style={styles.groupDate}>
+            {createdDate ? `Created ${createdDate.toLocaleDateString()}` : 'Created —'}
+          </Text>
+          <TouchableOpacity
+            style={[styles.sendPaymentButton, !(item.members?.length) && { opacity: 0.6 }]}
+            onPress={() => handleSendGroupPayment(item)}
+            disabled={!(item.members?.length)}
+          >
+            <Send size={16} color="#FFFFFF" />
+            <Text style={styles.sendPaymentButtonText}>Send Payments</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBackToProfile}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#374151" />
         </TouchableOpacity>
         <Text style={styles.title}>Grouped Payments</Text>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => setShowCreateModal(true)}
-        >
+        <TouchableOpacity style={styles.createButton} onPress={() => setShowCreateModal(true)}>
           <Plus size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
       {/* Content */}
-      {groups.length === 0 ? (
+      {(!groups || groups.length === 0) ? (
         <View style={styles.emptyState}>
           <Users size={64} color="#9CA3AF" />
           <Text style={styles.emptyTitle}>No Groups Yet</Text>
           <Text style={styles.emptySubtitle}>
             Create your first payment group to start managing group transactions
           </Text>
-          <TouchableOpacity
-            style={styles.createFirstButton}
-            onPress={() => setShowCreateModal(true)}
-          >
+          <TouchableOpacity style={styles.createFirstButton} onPress={() => setShowCreateModal(true)}>
             <Plus size={20} color="#FFFFFF" />
             <Text style={styles.createFirstButtonText}>Create First Group</Text>
           </TouchableOpacity>
@@ -267,17 +313,11 @@ export default function GroupedPayments() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowCreateModal(false)}
-            >
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowCreateModal(false)}>
               <Text style={styles.modalCloseButtonText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Create New Group</Text>
-            <TouchableOpacity
-              style={styles.modalSaveButton}
-              onPress={handleCreateGroup}
-            >
+            <TouchableOpacity style={styles.modalSaveButton} onPress={handleCreateGroup}>
               <Text style={styles.modalSaveButtonText}>Create</Text>
             </TouchableOpacity>
           </View>
@@ -300,15 +340,15 @@ export default function GroupedPayments() {
                 value={groupDescription}
                 onChangeText={setGroupDescription}
                 placeholder="Enter group description (optional)"
-                multiline={true}
+                multiline
                 numberOfLines={3}
               />
             </View>
 
             <View style={styles.modalInfo}>
               <Text style={styles.modalInfoText}>
-                • You can add members after creating the group{'\n'}
-                • Each member can have different payment amounts{'\n'}
+                • You can add members after creating the group{"\n"}
+                • Each member can have different payment amounts{"\n"}
                 • Groups help organize payments for events, bills, or shared expenses
               </Text>
             </View>
@@ -325,17 +365,11 @@ export default function GroupedPayments() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowAddMemberModal(false)}
-            >
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowAddMemberModal(false)}>
               <Text style={styles.modalCloseButtonText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Member</Text>
-            <TouchableOpacity
-              style={styles.modalSaveButton}
-              onPress={handleAddMember}
-            >
+            <TouchableOpacity style={styles.modalSaveButton} onPress={handleAddMember}>
               <Text style={styles.modalSaveButtonText}>Add</Text>
             </TouchableOpacity>
           </View>
@@ -375,8 +409,8 @@ export default function GroupedPayments() {
 
             <View style={styles.modalInfo}>
               <Text style={styles.modalInfoText}>
-                • Member will receive payment notification{'\n'}
-                • Amount will be added to group total{'\n'}
+                • Member will receive payment notification{"\n"}
+                • Amount will be added to group total{"\n"}
                 • You can edit or remove members later
               </Text>
             </View>

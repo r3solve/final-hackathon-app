@@ -177,7 +177,7 @@ export default function Wallet() {
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>{getGreeting()},</Text>
             <Text style={styles.name}>{profile?.fullName}</Text>
-            <Text style={styles.welcomeText}>Welcome to PayFlow Ghana</Text>
+            <Text style={styles.welcomeText}>Welcome to Astra Pay</Text>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity 
