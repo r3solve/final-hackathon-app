@@ -49,13 +49,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <CreditCard size={size} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="document-upload"
-        options={{
-          title: 'Verify',
-          tabBarIcon: ({ color, size }) => <Shield size={size} color={color} />,
-        }}
-      />
+    
       <Tabs.Screen
         name="payment-methods"
         options={{
