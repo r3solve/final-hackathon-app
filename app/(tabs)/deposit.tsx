@@ -52,11 +52,9 @@ export default function Deposit() {
       const userId = user.uid;
       // Wrap email in quotes and don't encode the @ symbol
       const userEmail = `"${emailToUse}"`;
-      // Convert amount to integer (remove decimal places)
-      const amountInt = Math.floor(parseFloat(depositAmount));
-      const amountParam = encodeURIComponent(amountInt.toString());
+      const amountParam = encodeURIComponent(depositAmount);
       
-              const depositUrl = `${baseUrl}/${userId}?email=${userEmail}&amount=${amountParam}`;
+      const depositUrl = `${baseUrl}/${userId}?email=${userEmail}&amount=50`;
       
       return { url: depositUrl, error: null };
     } catch (error) {
@@ -77,16 +75,7 @@ export default function Deposit() {
       return;
     }
 
-    const amountValue = parseFloat(amount);
-    if (amountValue < 1) {
-      Alert.alert('Minimum Amount', 'The minimum deposit amount is ₵1.00');
-      return;
-    }
 
-    if (amountValue > 100000) {
-      Alert.alert('Maximum Amount', 'The maximum deposit amount is ₵100,000.00');
-      return;
-    }
 
     // Show PIN verification modal instead of proceeding directly
     setShowPINModal(true);
@@ -140,7 +129,7 @@ export default function Deposit() {
         setLoading(false);
       }, 30000); // 30 seconds timeout
       
-      setLoadTimeout(timeout);
+      setLoadTimeout(timeout as any);
       
       return () => {
         if (timeout) clearTimeout(timeout);

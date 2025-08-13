@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword, sendEmailVerification, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { PINManager } from '@/lib/pin-manager';
@@ -11,10 +11,16 @@ interface AuthContextType {
   loading: boolean;
   pinVerified: boolean;
   hasPIN: boolean;
+  canPerformTransactions:any,
+  canSendMoney: any,
+  canReceiveMoney: any,
+  canDeposit :any,
+  refreshProfile:any,
   signOut: () => Promise<void>;
   checkPINStatus: () => Promise<void>;
   setPINVerified: (verified: boolean) => void;
   signIn: (email: string, password: string) => Promise<{ success?: boolean; error?: string }>;
+  signUp: (email: string, password: string) => Promise<{ success?: boolean; error?: string }>;
   resendVerificationEmail: () => Promise<{ success?: boolean; error?: string }>;
 }
 
@@ -26,6 +32,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [pinVerified, setPINVerified] = useState(false);
   const [hasPIN, setHasPIN] = useState(false);
+
+  // Sign up function
+  const signUp = async (email: string, password: string) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const currentUser = userCredential.user;
+      if (currentUser && !currentUser.emailVerified) {
+        await sendEmailVerification(currentUser);
+        return { success: true, error: 'Please verify your email. A verification link has been sent.' };
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.error(err);
+      return { error: err.message || 'Failed to sign up' };
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -101,6 +123,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Checks if user can perform any transaction (basic verification)
+  const canPerformTransactions = () => {
+    return !!profile && profile.verificationStatus === "approved";
+  };
+
+  // Checks if user can send money
+  const canSendMoney = () => {
+    return canPerformTransactions() && (profile?.walletBalance ?? 0) > 0;
+  };
+
+  // Checks if user can receive money
+  const canReceiveMoney = () => {
+    return canPerformTransactions();
+  };
+
+  // Checks if user can deposit money
+  const canDeposit = () => {
+    return canPerformTransactions();
+  };
+
+  // Refreshes the profile from Firestore
+  const refreshProfile = async () => {
+    if (!user) return;
+    try {
+      const profileRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(profileRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setProfile({
+          fullName: data.fullName || '',
+          email: data.email || user.email || '',
+          phoneNumber: data.phoneNumber || '',
+          walletBalance: data.walletBalance || 0,
+          isVerified: data.isVerified || false,
+          verificationStatus: data.verificationStatus || 'pending',
+          profileImageUrl: data.profileImageUrl || undefined,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    }
+  };
+
   const resendVerificationEmail = async () => {
     try {
       if (!auth.currentUser) {
@@ -142,7 +209,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkPINStatus,
     setPINVerified,
     signIn,
+  signUp,
     resendVerificationEmail,
+    canPerformTransactions,
+    canSendMoney,
+    canReceiveMoney,
+    canDeposit,
+    refreshProfile,
   };
 
   return (

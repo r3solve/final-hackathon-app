@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft,  User, Phone, DollarSign } from 'lucide-react-native';
+import { ArrowLeft,  User, Phone, DollarSign, Send } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import PINVerificationModal from '@/components/PINVerificationModal';
 
-export default function Send() {
+export default function SendScreen() {
   const { profile } = useAuth();
   const [recipientPhone, setRecipientPhone] = useState('');
   const [amount, setAmount] = useState('');
@@ -194,7 +194,7 @@ export default function Send() {
           onPress={handleSendMoney}
           disabled={!recipientPhone.trim() || !amount || parseFloat(amount) <= 0}
         >
-          <Send size={20} color="#FFFFFF" />
+          <Send  color="#FFFFFF" />
           <Text style={styles.sendButtonText}>Send Money</Text>
         </TouchableOpacity>
 

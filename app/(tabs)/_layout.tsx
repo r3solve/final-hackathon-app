@@ -93,12 +93,7 @@ export default function TabLayout() {
           href: null, // Hidden tab
         }}
       />
-      <Tabs.Screen
-        name="verify"
-        options={{
-          href: null, // Hidden tab
-        }}
-      />
+     
     </Tabs>
   );
 }

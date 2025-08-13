@@ -2,6 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { PINData, PINVerificationResult, PINCreationResult } from '@/types/env';
+import SHA256 from 'crypto-js/sha256';
+import Hex from 'crypto-js/enc-hex';
+
 
 const PIN_STORAGE_KEY = 'user_pin';
 const PIN_ATTEMPTS_KEY = 'pin_attempts';
@@ -185,16 +188,10 @@ export class PINManager {
   }
 
   // Simple PIN hashing (in production, use a more secure method)
-  private static async hashPIN(pin: string): Promise<string> {
-    // This is a simple hash for demo purposes
-    // In production, use bcrypt or similar
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin + 'salt');
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
+private static async hashPIN(pin: string): Promise<string> {
+  const saltedPin = pin + 'salt'; // still adding salt for basic security
+  return SHA256(saltedPin).toString(Hex);
+}
   // Get remaining attempts before lockout
   static async getRemainingAttempts(): Promise<number> {
     try {
