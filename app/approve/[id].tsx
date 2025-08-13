@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView , {PROVIDER_GOOGLE} from 'react-native-maps';
+import MapView , {PROVIDER_GOOGLE, Marker} from 'react-native-maps';
 
 import { useLocalSearchParams, router } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -44,10 +44,26 @@ export default function Approve() {
   const handleApprove = async () => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'transferRequests', id), {
-        status: 'approved',
-        updatedAt: new Date(),
+      // await updateDoc(doc(db, 'transferRequests', id), {
+      //   status: 'approved',
+      //   updatedAt: new Date(),
+      // });
+      const response  = await fetch(`https://transferfunds-7bkcleiriq-uc.a.run.app`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+           sender_id: transferRequest.senderId,
+           reciever_id: transferRequest.recieverId, 
+           amount: transferRequest.amount,
+           description: transferRequest.description }),
       });
+      if (!response.ok) {
+        throw new Error('Failed to approve transaction');
+      }
+      // Optionally, you can navigate back or show a success message
+      router.push('/(tabs)/transactions');
       Alert.alert('Success', 'Transaction approved!', [
         { text: 'OK', onPress: () => router.push('/(tabs)') },
       ]);
@@ -73,6 +89,7 @@ export default function Approve() {
       <View style={styles.topCard}>
         {/* Photo Section - rectangular image covering top quarter */}
         {verificationSelfieUrl ? (
+          
           <Image source={{ uri: verificationSelfieUrl }} style={styles.topImage} />
         ) : (
           <View style={[styles.topImage, styles.imagePlaceholder]}>
@@ -86,27 +103,30 @@ export default function Approve() {
        <View style={styles.locationSection}>
           {verificationLocation ? (
             <>
-              {/* <Text style={styles.sectionTitle}>Submitted Location</Text>
-              <Text style={styles.info}>
-                Latitude: {verificationLocation.latitude}
-                {'\n'}
-                Longitude: {verificationLocation.longitude}
-              </Text> */}
-              <TouchableOpacity style={styles.actionButton} onPress={handleViewLocation}>
-                <Text style={styles.actionButtonText}>View Location in Google Maps</Text>
-              </TouchableOpacity>
+            
             </>
           ) : (
             <Text style={styles.info}>No location submitted.</Text>
           )}
         </View>
       <View style={styles.container}>
+           <Text style={styles.sectionTitle}>Location Submitted</Text>
+
       <MapView
         showsUserLocation
         provider={PROVIDER_GOOGLE}
+        initialRegion={{
+          latitude:  37.78825,
+          longitude: -122.4324,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        }}
       style={styles.map} />
     </View>
       <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.altButton} onPress={handleViewLocation}>
+                <Text style={styles.actionButtonText}>View Location in Google Maps</Text>
+              </TouchableOpacity>
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleApprove}
@@ -207,9 +227,23 @@ const styles = StyleSheet.create({
     marginHorizontal: 18,
     marginTop: 24,
   },
+  altButton: {
+    backgroundColor: '#1bc0f2ff',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    marginTop: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   submitButton: {
     backgroundColor: '#22C55E',
     paddingVertical: 16,
+    marginVertical: 8,
     borderRadius: 16,
     alignItems: 'center',
     shadowColor: '#22C55E',

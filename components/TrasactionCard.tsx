@@ -49,38 +49,38 @@ const TrasactionCard = ({transactionData}:{transactionData:any}) => {
           <Text style={styles.value}>{senderPhone}</Text>
         </View>
         <View style={{flex: 1}}>
-            <Text style={styles.description}>{description}</Text>
-            <View>
-            {status != 'completed'? <Text style={styles.helpText} >Waiting sender approval</Text> : <Text style={styles.helpText} >Transaction completed</Text>}
+          <Text style={styles.description}>{description}</Text>
+          <View>
+            {status != 'completed'
+              ? <Text style={styles.helpText}>Waiting sender approval</Text>
+              : <Text style={styles.helpText}>Transaction completed</Text>}
+          </View>
         </View>
-      </View>
-    
-     
       </View>
       <Text style={styles.date}>{formattedDate}</Text>
-     
-        <View style={styles.buttonRow}>
-          {canApprove ? (
-            <Text
-              style={styles.buttonApprove}
-              onPress={() => router.push(`/approve/${id}` as any)}
-            >
-              Approve
-            </Text>
-          ) : user?.uid === senderId ? (
-            <Text style={[styles.buttonVerify, { opacity: 0.5 }]}>
-              Approve
-            </Text>
-          ) : (
-            <Text
-              style={styles.buttonVerify}
-              onPress={() => router.push(`/verify/${id}` as any)}
-            >
-              Verify
-            </Text>
-          )}
-        </View>
-      
+      <View style={styles.buttonRow}>
+        {status === 'completed' ? (
+          <Text style={styles.buttonApprove}>Completed</Text>
+        ) : canApprove ? (
+          <Text
+            style={styles.buttonApprove}
+            onPress={() => router.push(`/approve/${id}` as any)}
+          >
+            Approve
+          </Text>
+        ) : user?.uid === senderId ? (
+          <Text style={[{color:"gray"}, { opacity: 0.65 }]}>
+            Completed
+          </Text>
+        ) : (
+          <Text
+            style={styles.buttonVerify}
+            onPress={() => router.push(`/verify/${id}` as any)}
+          >
+            Verify
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
