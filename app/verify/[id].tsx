@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -15,22 +14,43 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage  } from '@/lib/firebase';
+import * as Location from 'expo-location';
+
 import { MapPin, ArrowLeft, CircleCheck as CheckCircle, X } from 'lucide-react-native';
 
 export default function VerifyTransfer() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const [locationPermission, setLocationPermission] = useState<Location.LocationPermissionStatus | null>(null);
+  const [locationPermission, setLocationPermission] = useState<any>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [transferRequest, setTransferRequest] = useState<any>(null);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchTransferRequest();
     requestLocationPermission();
   }, [id]);
+
+  
+  useEffect(() => {
+    async function getCurrentLocation() {
+      
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+    }
+
+    getCurrentLocation();
+  }, []);
 
   const fetchTransferRequest = async () => {
     try {
@@ -73,9 +93,8 @@ export default function VerifyTransfer() {
     }
 
     try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      
+      let location = await Location.getCurrentPositionAsync({});
       setLocation(location);
       Alert.alert('Success', 'Location captured successfully');
     } catch (error) {
@@ -143,6 +162,7 @@ export default function VerifyTransfer() {
           timestamp: location.timestamp,
         },
         verifiedAt: new Date(),
+        updatedAt: new Date(),
       });
 
       Alert.alert(

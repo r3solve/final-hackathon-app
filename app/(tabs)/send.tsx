@@ -68,7 +68,7 @@ export default function SendScreen() {
       isApprovedByRecipient: false,
       status: 'pending',
       liveLocation: null,
-      selfiePhotoUrl: null, 
+      verificationSelfieUrl: null, 
       createdAt: new Date(),
       updatedAt: new Date(),
     }

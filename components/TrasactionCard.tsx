@@ -17,19 +17,20 @@ const TrasactionCard = ({transactionData}:{transactionData:any}) => {
     status,
     createdAt,
     updatedAt,
+    verificationSelfieUrl,
+    verificationLocation,
   } = transactionData;
 
-    // Get current user from context
-    const { user } = require('@/contexts/AuthContext').useAuth();
+  // Get current user from context
+  const { user } = require('@/contexts/AuthContext').useAuth();
   const formattedDate = createdAt.toDate().toLocaleString();
 
-  const handleApprove = () => {
-    Alert.alert('Approve Transaction', `Transaction ID: ${transactionData.id}`);
-  };
-
-  const handleCancel = () => {
-    Alert.alert('Cancel Transaction', `Transaction ID: ${transactionData.id}`);
-  };
+  // Determine if transaction is ready for approval
+  const canApprove =
+    user?.uid === senderId &&
+    status === 'verified' &&
+    verificationSelfieUrl &&
+    verificationLocation;
 
   return (
     <View style={styles.card}>
@@ -38,7 +39,7 @@ const TrasactionCard = ({transactionData}:{transactionData:any}) => {
           <Text style={styles.iconText}>{status === 'pending' ? '⏳' : '💸'}</Text>
         </View>
         <View style={{flex: 1, marginLeft: 12}}>
-          <Text style={styles.amount}>${amount}</Text>
+          <Text style={styles.amount}>GH₵ {amount}</Text>
           <Text style={styles.status}>{status === 'pending' ? 'Pending' : status}</Text>
         </View>
       </View>
@@ -48,24 +49,38 @@ const TrasactionCard = ({transactionData}:{transactionData:any}) => {
           <Text style={styles.value}>{senderPhone}</Text>
         </View>
         <View style={{flex: 1}}>
-          <Text style={styles.label}>Recipient</Text>
-          <Text style={styles.value}>{recieverPhone}</Text>
+            <Text style={styles.description}>{description}</Text>
+            <View>
+            {status != 'completed'? <Text style={styles.helpText} >Waiting sender approval</Text> : <Text style={styles.helpText} >Transaction completed</Text>}
         </View>
       </View>
-      <Text style={styles.description}>{description}</Text>
+    
      
+      </View>
       <Text style={styles.date}>{formattedDate}</Text>
-      {status === 'pending' && (
+     
         <View style={styles.buttonRow}>
-          {user?.uid === recieverId && (
-            <Text style={styles.buttonVerify} onPress={() => router.push(`/verify/${id}` as any)}>Verify</Text>
+          {canApprove ? (
+            <Text
+              style={styles.buttonApprove}
+              onPress={() => router.push(`/approve/${id}` as any)}
+            >
+              Approve
+            </Text>
+          ) : user?.uid === senderId ? (
+            <Text style={[styles.buttonVerify, { opacity: 0.5 }]}>
+              Approve
+            </Text>
+          ) : (
+            <Text
+              style={styles.buttonVerify}
+              onPress={() => router.push(`/verify/${id}` as any)}
+            >
+              Verify
+            </Text>
           )}
-          {user?.uid === senderId ? (
-          <Text style={styles.buttonVerify} onPress={() => router.push(`/approve/${id}` as any)}>Verify</Text>
-          ) : null}
-          
         </View>
-      )}
+      
     </View>
   );
 }
@@ -149,6 +164,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#374151',
     fontWeight: '600',
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+    marginBottom: 8,
   },
   description: {
     fontSize: 14,

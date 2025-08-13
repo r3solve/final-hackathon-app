@@ -68,38 +68,37 @@ export default function Approve() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Transaction Verification</Text>
-        <Text style={styles.subtitle}>Transaction ID: <Text style={{ fontWeight: 'bold' }}>{id}</Text></Text>
-
-        {/* Location Section */}
-        {verificationLocation ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Submitted Location</Text>
-            <Text style={styles.info}>
-              Latitude: {verificationLocation.latitude}
-              {'\n'}
-              Longitude: {verificationLocation.longitude}
-            </Text>
-            <TouchableOpacity style={styles.actionButton} onPress={handleViewLocation}>
-              <Text style={styles.actionButtonText}>View Location in Google Maps</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Text style={styles.info}>No location submitted.</Text>
-        )}
-
-        {/* Photo Section */}
+      <View style={styles.topCard}>
+        {/* Photo Section - rectangular image covering top quarter */}
         {verificationSelfieUrl ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Submitted Photo</Text>
-            <Image source={{ uri: verificationSelfieUrl }} style={styles.image} />
-          </View>
+          <Image source={{ uri: verificationSelfieUrl }} style={styles.topImage} />
         ) : (
-          <Text style={styles.info}>No photo submitted.</Text>
+          <View style={[styles.topImage, styles.imagePlaceholder]}>
+            <Text style={styles.placeholderText}>No photo submitted.</Text>
+          </View>
         )}
-
-        {/* Approve Button */}
+        {/* Location Section under image */}
+       
+      </View>
+      {/* Approve Button below card */}
+       <View style={styles.locationSection}>
+          {verificationLocation ? (
+            <>
+              <Text style={styles.sectionTitle}>Submitted Location</Text>
+              <Text style={styles.info}>
+                Latitude: {verificationLocation.latitude}
+                {'\n'}
+                Longitude: {verificationLocation.longitude}
+              </Text>
+              <TouchableOpacity style={styles.actionButton} onPress={handleViewLocation}>
+                <Text style={styles.actionButtonText}>View Location in Google Maps</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.info}>No location submitted.</Text>
+          )}
+        </View>
+      <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleApprove}
@@ -118,36 +117,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingTop: 32,
+    paddingTop: 0,
   },
-  card: {
+  topCard: {
     backgroundColor: '#fff',
-    marginHorizontal: 24,
-    padding: 24,
-    borderRadius: 16,
+    marginHorizontal: 18,
+    marginTop: 32,
+    borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.07,
     shadowRadius: 8,
-    elevation: 2,
-    marginTop: 32,
+    elevation: 3,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
-    textAlign: 'center',
-    marginBottom: 8,
+  topImage: {
+    width: '100%',
+    height: '25%',
+    minHeight: 160,
+    maxHeight: 220,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    resizeMode: 'cover',
+    backgroundColor: '#F3F4F6',
   },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#666',
-  },
-  section: {
-    marginBottom: 24,
+  imagePlaceholder: {
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#9CA3AF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  locationSection: {
+    padding: 18,
+    alignItems: 'center',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    backgroundColor: '#fff',
   },
   sectionTitle: {
     fontSize: 15,
@@ -156,46 +164,42 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   info: {
-    marginTop: 8,
+    marginTop: 4,
     fontSize: 15,
     color: '#333',
     textAlign: 'center',
-  },
-  image: {
-    marginTop: 12,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 2,
-    borderColor: '#22C55E',
+    marginBottom: 8,
   },
   actionButton: {
     backgroundColor: '#22C55E',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    marginTop: 8,
     alignItems: 'center',
     shadowColor: '#22C55E',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 2,
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+  },
+  buttonContainer: {
+    marginHorizontal: 18,
+    marginTop: 24,
   },
   submitButton: {
     backgroundColor: '#22C55E',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
-    marginTop: 8,
     shadowColor: '#22C55E',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 4,
   },

@@ -18,15 +18,7 @@ import {
 import { db } from '@/lib/firebase';
 import { router } from 'expo-router';
 import { 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  Clock, 
   CircleCheck as CheckCircle, 
-  User, 
-  MapPin, 
-  Camera, 
-  XCircle, 
-  ArrowRight,
   Shield,
   CreditCard
 } from 'lucide-react-native';
@@ -64,10 +56,53 @@ interface Transaction {
 export default function Transactions() {
   const { user, profile } = useAuth();
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
-  // const [, setTransactions] = useState<Transaction[]>([]);
-  // const [allMyTransactions, setAllMyTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [allSentTransactions, setSentTransactions] = useState<TransferRequest[]>([]);
+  const [segment, setSegment] = useState<'incoming' | 'sent'>('incoming');
+  const [displayedTransactions, setDisplayedTransactions] = useState<TransferRequest[]>([]);
+  // Fetch data and set state
+  const fetchData = async () => {
+    if (!user) return;
+    try {
+      const allPendingTransfers = await fetchAllTransactionsForUser(user?.uid);
+      const allUserTransfers = await fetchAllTransactionsByUser(user?.uid);
+      setTransferRequests(allPendingTransfers);
+      setSentTransactions(allUserTransfers);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+  const changeSegment = (newSegment: 'incoming' | 'sent') => {
+    setSegment(newSegment);
+    if (newSegment === 'incoming') {
+      setDisplayedTransactions(transferRequests);
+    }
+    else {
+      setDisplayedTransactions(allSentTransactions);
+    }
+  }
+
+  useEffect(() => {
+    fetchData();
+    if (user) {
+      const transfersQuery = query(
+        collection(db, 'transferRequests'),
+        where('senderId', '==', user.uid),
+      );
+      const unsubscribe = onSnapshot(transfersQuery, () => {
+        fetchData();
+      });
+      return () => unsubscribe();
+    }
+  }, [user]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
 
   // Check if user can perform transactions
   if (!user?.emailVerified) {
@@ -99,49 +134,6 @@ export default function Transactions() {
       </SafeAreaView>
     );
   }
-
-  const fetchData = async () => {
-    
-    if (!user) return;
-
-    try {
-      // Fetch pending transfer requests
-      const allPending = await fetchAllTransactionsForUser(user?.uid);
-    
-      setTransferRequests(allPending)
-      // setAllMyTransactions(allPending)
-      console.log('Fetched all send requests:', allPending);
-
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  };
-
-  useEffect(() => {
-    fetchData();
-
-    // Set up real-time listener for transfer updates
-    if (user) {
-      const transfersQuery = query(
-        collection(db, 'transferRequests'),
-        where('senderId', '==', user.uid),
-        
-      );
-
-      const unsubscribe = onSnapshot(transfersQuery, (snapshot) => {
-        // Refetch data when there are changes
-        fetchData();
-      });
-
-      return () => unsubscribe();
-    }
-  }, [user]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GH', {
@@ -309,10 +301,6 @@ export default function Transactions() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View>
-        <TouchableOpacity>Pending</TouchableOpacity>
-        <TouchableOpacity>Completed</TouchableOpacity>
-      </View>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -331,22 +319,59 @@ export default function Transactions() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.segmentContainer}>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              segment === 'incoming' && styles.segmentButtonActive,
+            ]}
+            onPress={() => changeSegment('incoming')}
+          >
+            <Text
+              style={[
+                styles.segmentButtonText,
+                segment === 'incoming' && styles.segmentButtonTextActive,
+              ]}
+            >
+              Incoming
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              segment === 'sent' && styles.segmentButtonActive,
+            ]}
+            onPress={() => changeSegment('sent')}
+          >
+            <Text
+              style={[
+                styles.segmentButtonText,
+                segment === 'sent' && styles.segmentButtonTextActive,
+              ]}
+            >
+              Sent
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* All Transactions */}
-        {transferRequests.length > 0 && (
-          <View style={{paddingHorizontal: 16}}>
-            <Text style={{fontSize: 18, fontWeight: '600', marginBottom: 8}}>All Transactions</Text>
-            {transferRequests.map((txn) => (
+        {/* Display transactions based on segment */}
+        {displayedTransactions.length > 0 ? (
+          <View style={{ paddingHorizontal: 16 }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
+              {segment === 'incoming' ? 'Incoming Requests' : 'Sent Requests'}
+            </Text>
+            {displayedTransactions.map((txn) => (
               <TrasactionCard key={txn.id} transactionData={txn} />
             ))}
           </View>
-        )}
-
-        {/* Empty State */}
-        {transferRequests.length === 0 && transferRequests.length === 0 && (
+        ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No transactions found</Text>
-            <Text style={styles.emptySubtext}>You have not made or received any transactions yet.</Text>
+            <Text style={styles.emptySubtext}>
+              {segment === 'incoming'
+                ? 'No incoming requests to verify.'
+                : 'You have not sent any requests yet.'}
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -725,5 +750,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#8B5CF6',
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+    gap: 8,
+  },
+  segmentButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  segmentButtonActive: {
+    backgroundColor: '#55f482ff',
+  },
+  segmentButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  segmentButtonTextActive: {
+    color: '#FFFFFF',
   },
 });

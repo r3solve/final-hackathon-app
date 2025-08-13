@@ -61,8 +61,7 @@ function RootLayoutNav() {
         <Stack.Screen name="document-upload" options={{ title: 'Documents', headerShown: false }} />
         <Stack.Screen name="verify/[id]" options={{  title: 'Verify Transaction' }} />
         <Stack.Screen name="approve/[id]" options={{ title: 'Approve Transaction' }} />
-        <Stack.Screen name="create-pin" options={{ title: 'Create PIN' }} />
-        <Stack.Screen name="verify-pin" options={{ title: 'Verify PIN' }} />
+        
         <Stack.Screen name="+not-found" />
       </Stack>
     </>

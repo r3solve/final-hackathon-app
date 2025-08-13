@@ -35,7 +35,7 @@ export const createANewTransactionRequest = async (transactionData: any) => {
 export const fetchAllTransactionsByUser = async (userId: string,) => {
     try {
         const q = query(
-            collection(db, 'transactions'),
+            collection(db, 'transferRequests'),
             where('senderId', '==', userId)
         );
         const querySnapshot = await getDocs(q);
