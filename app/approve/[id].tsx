@@ -44,10 +44,7 @@ export default function Approve() {
   const handleApprove = async () => {
     setLoading(true);
     try {
-      // await updateDoc(doc(db, 'transferRequests', id), {
-      //   status: 'approved',
-      //   updatedAt: new Date(),
-      // });
+      
       const response  = await fetch(`https://transferfunds-7bkcleiriq-uc.a.run.app`, {
         method: 'POST',
         headers: {

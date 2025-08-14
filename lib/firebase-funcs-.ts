@@ -108,3 +108,14 @@ export const fetchTransactionsUpdatedByReciever = async () => {
         return [];
     }
 }
+
+export const createANewProfile = async (profileData: any) => {
+    try {
+        const profileRef = collection(db, 'profiles');
+        const docRef = await addDoc(profileRef, profileData);
+        return { success: true, id: docRef.id };
+    } catch (error) {
+        console.error('Error creating profile:', error);
+        return { success: false, error: 'Failed to create profile' };
+    }       
+}

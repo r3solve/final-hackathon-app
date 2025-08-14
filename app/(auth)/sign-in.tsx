@@ -87,7 +87,7 @@ export default function SignIn() {
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.welcomeText}>Welcome back to PayFlow</Text>
+        <Text style={styles.welcomeText}>Welcome back to Astra Pay</Text>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Email</Text>

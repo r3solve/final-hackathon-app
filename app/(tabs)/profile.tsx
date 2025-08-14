@@ -124,9 +124,7 @@ export default function Profile() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
-          <TouchableOpacity style={styles.settingsButton}>
-            <Settings size={24} color="#374151" />
-          </TouchableOpacity>
+        
         </View>
 
         {/* User Info Card */}
@@ -156,13 +154,23 @@ export default function Profile() {
             ₵{profile?.walletBalance ? profile.walletBalance.toFixed(2) : '0.00'}
           </Text>
           
-          <TouchableOpacity 
-            style={styles.depositButton} 
-            onPress={() => router.push('/(tabs)/deposit')}
-          >
-            <Plus size={20} color="#FFFFFF" />
-            <Text style={styles.depositText}>Deposit Money</Text>
-          </TouchableOpacity>
+          {/* Deposit and Withdraw buttons side by side */}
+          <View style={styles.depositWithdrawRow}>
+            <TouchableOpacity 
+              style={styles.depositButton} 
+              onPress={() => router.push('/(tabs)/deposit')}
+            >
+              <Plus size={20} color="#FFFFFF" />
+              <Text style={styles.depositText}>Deposit Money</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.depositButton} 
+              onPress={() => router.push('/withdraw')}
+            >
+              <Plus size={20} color="#FFFFFF" />
+              <Text style={styles.depositText}>Withdraw</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Quick Actions */}
@@ -478,6 +486,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   depositButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -565,10 +574,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  verificationText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   balanceCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
@@ -587,9 +592,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   balanceAmount: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#1a2738ff',
   },
   section: {
     marginBottom: 32,
@@ -793,5 +798,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#9CA3AF',
     fontWeight: '600',
+  },
+  depositWithdrawRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 12,
   },
 });
